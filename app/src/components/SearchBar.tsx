@@ -4,9 +4,10 @@ import type { CardItem } from "../types";
 interface SearchBarProps {
   cards: CardItem[];
   onSelect: (card: CardItem) => void;
+  placeholder?: string;
 }
 
-export default function SearchBar({ cards, onSelect }: SearchBarProps) {
+export default function SearchBar({ cards, onSelect, placeholder }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CardItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -18,6 +19,7 @@ export default function SearchBar({ cards, onSelect }: SearchBarProps) {
     if (query.trim().length === 0) {
       setResults([]);
       setIsOpen(false);
+      isSelectingRef.current = false;
       return;
     }
     const lower = query.toLowerCase();
@@ -102,7 +104,7 @@ export default function SearchBar({ cards, onSelect }: SearchBarProps) {
         </svg>
         <input
           type="text"
-          placeholder="Search cards by title..."
+          placeholder={placeholder ?? "Search cards by title..."}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => {
