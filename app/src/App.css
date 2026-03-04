@@ -421,15 +421,16 @@
 }
 
 .item-deck {
-  display: flex;
-  flex-direction: row;
-  gap: 0;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: 90px;
   background: #1a1a22;
   border: 2px solid #2a2a30;
   border-radius: 12px;
-  padding: 0.5rem;
-  min-height: 100px;
-  align-items: stretch;
+  padding: 6px;
+  gap: 0;
+  box-sizing: border-box;
+  position: relative;
 }
 
 .item-deck.dragging {
@@ -437,13 +438,35 @@
   border-style: dashed;
 }
 
+.deck-slot {
+  grid-row: 1;
+  border: 1px dashed #252530;
+  border-radius: 6px;
+  margin: 2px;
+  pointer-events: none;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.deck-slot.hover-valid {
+  background: rgba(88, 101, 242, 0.18);
+  border-color: #5865f2;
+  border-style: solid;
+}
+
+.deck-slot.hover-invalid {
+  background: rgba(255, 60, 60, 0.18);
+  border-color: #f55;
+  border-style: solid;
+}
+
 .deck-item {
-  flex: 0 0 calc(var(--slot-span) * (100% / 10) - 4px);
-  margin: 0 2px;
+  grid-row: 1;
   border-radius: 8px;
   cursor: grab;
-  transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
+  transition: opacity 0.15s;
   user-select: none;
+  z-index: 2;
+  margin: 2px;
 }
 
 .deck-item:active {
@@ -451,11 +474,12 @@
 }
 
 .deck-item.is-dragging {
-  opacity: 0.3;
+  opacity: 0.25;
 }
 
-.deck-item.drop-target {
-  box-shadow: -3px 0 0 0 #5865f2;
+.deck-item.is-shifting .deck-item-inner {
+  outline: 2px solid rgba(88, 101, 242, 0.5);
+  outline-offset: -2px;
 }
 
 .deck-item-inner {
@@ -502,14 +526,6 @@
   color: #666;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-.deck-slot-empty {
-  flex: 0 0 calc(100% / 10 - 4px);
-  margin: 0 2px;
-  border: 1px dashed #2a2a30;
-  border-radius: 8px;
-  min-height: 80px;
 }
 
 .deck-hint {

@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import SearchBar from "../components/SearchBar";
-import ItemDeck, { getSlotSize } from "../components/ItemDeck";
+import ItemDeck, { getSlotSize, buildOccupancy } from "../components/ItemDeck";
+// canPlace removed – layout conflicts are now resolved by computeShiftedLayout inside ItemDeck
 import type { DeckItem } from "../components/ItemDeck";
 import { useCards } from "../hooks/useCards";
 import type { CardItem } from "../types";
@@ -9,6 +10,19 @@ import type { CardItem } from "../types";
 const TOTAL_SLOTS = 10;
 let uidCounter = 0;
 const DECK_STORAGE_KEY = "bazaarsim_deck";
+
+/** Find the first contiguous run of free slots that fits slotSize. */
+function findFirstAvailableSlot(items: DeckItem[], slotSize: number): number | null {
+  const occupied = buildOccupancy(items);
+  for (let start = 0; start <= TOTAL_SLOTS - slotSize; start++) {
+    let fits = true;
+    for (let i = 0; i < slotSize; i++) {
+      if (occupied[start + i]) { fits = false; break; }
+    }
+    if (fits) return start;
+  }
+  return null;
+}
 
 const loadDeckFromStorage = (): DeckItem[] => {
   try {
@@ -21,7 +35,16 @@ const loadDeckFromStorage = (): DeckItem[] => {
         return Math.max(max, isNaN(num) ? 0 : num);
       }, 0);
       uidCounter = maxUid;
-      return parsed;
+      // Back-fill startSlot for saves that pre-date the slot positioning feature
+      let cursor = 0;
+      return parsed.map((item) => {
+        if (item.startSlot == null) {
+          const slot = cursor;
+          cursor += item.slotSize;
+          return { ...item, startSlot: slot };
+        }
+        return item;
+      });
     }
   } catch (e) {
     console.error("Failed to load deck from storage:", e);
@@ -37,23 +60,21 @@ export default function DeckPage() {
   // Filter to items only (not skills, encounters, etc.)
   const itemCards = cards.filter((c) => c.Type === "Item");
 
-  const usedSlots = deckItems.reduce((sum, item) => sum + item.slotSize, 0);
-
   const handleAddItem = useCallback((card: CardItem) => {
     const slotSize = getSlotSize(card);
     setDeckItems((prev) => {
-      const currentUsedSlots = prev.reduce((sum, item) => sum + item.slotSize, 0);
-      if (currentUsedSlots + slotSize > TOTAL_SLOTS) {
+      const startSlot = findFirstAvailableSlot(prev, slotSize);
+      if (startSlot === null) {
         setShowFullWarning(true);
         setTimeout(() => setShowFullWarning(false), 3000);
-        return prev; // Not enough room
+        return prev; // No contiguous space available
       }
       const uid = `deck-${++uidCounter}`;
-      return [...prev, { uid, card, slotSize }];
+      return [...prev, { uid, card, slotSize, startSlot }];
     });
   }, []);
 
-  const handleReorder = useCallback((newItems: DeckItem[]) => {
+  const handleApplyLayout = useCallback((newItems: DeckItem[]) => {
     setDeckItems(newItems);
   }, []);
 
@@ -95,7 +116,7 @@ export default function DeckPage() {
 
             <ItemDeck
               items={deckItems}
-              onReorder={handleReorder}
+              onApplyLayout={handleApplyLayout}
               onRemove={handleRemove}
             />
           </>
