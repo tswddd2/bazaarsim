@@ -1,0 +1,429 @@
+{
+  "$type": "TCardItem",
+  "Tiers": {
+    "Gold": {
+      "Attributes": {
+        "Custom_0": 25
+      },
+      "AbilityIds": [],
+      "AuraIds": ["0", "1", "2", "3", "4", "5", "6"],
+      "TooltipIds": [0, 1]
+    },
+    "Diamond": {
+      "Attributes": {
+        "Custom_0": 50
+      },
+      "AbilityIds": [],
+      "AuraIds": ["0", "1", "2", "3", "4", "5", "6"],
+      "TooltipIds": [0, 1]
+    }
+  },
+  "Transform": null,
+  "Quests": null,
+  "Type": "Item",
+  "Id": "69688b74-fd2b-42a2-a018-2b720a13f95a",
+  "Version": "5.0.0",
+  "InternalName": "Swash Buckle",
+  "InternalDescription": null,
+  "StartingTier": "Gold",
+  "Size": "Medium",
+  "Heroes": ["Vanessa"],
+  "Tags": ["Apparel"],
+  "HiddenTags": ["Crit", "DamageReference", "HealReference", "ShieldReference"],
+  "ArtKey": "a540011b01fed86489f4714edccaeff6",
+  "TranslationKey": "c75a7d4f45658786203333a980e5eb96",
+  "AudioKey": "",
+  "Localization": {
+    "Title": {
+      "Key": "c75a7d4f45658786203333a980e5eb96",
+      "Text": "Swash Buckle"
+    },
+    "Description": null,
+    "FlavorText": null,
+    "Tooltips": [
+      {
+        "Content": {
+          "Key": "0d48b8db5917fbaaad6ace4015c09d34",
+          "Text": "Adjacent items have +{aura.0}% Crit Chance."
+        },
+        "TooltipType": "Passive",
+        "Prerequisites": null
+      },
+      {
+        "Content": {
+          "Key": "a6b827022356fb79f7eaf9616af3879c",
+          "Text": "Adjacent items have bonus Damage, Heal, or Shield equal to their Crit Chance."
+        },
+        "TooltipType": "Passive",
+        "Prerequisites": null
+      }
+    ]
+  },
+  "Abilities": {},
+  "Auras": {
+    "0": {
+      "Id": "0",
+      "ActiveIn": "HandOnly",
+      "Action": {
+        "$type": "TAuraActionCardModifyAttribute",
+        "AttributeType": "CritChance",
+        "Operation": "Add",
+        "Value": {
+          "$type": "TReferenceValueCardAttribute",
+          "Target": {
+            "$type": "TTargetCardSelf",
+            "Conditions": null
+          },
+          "AttributeType": "Custom_0",
+          "DefaultValue": 0,
+          "Modifier": null
+        },
+        "Target": {
+          "$type": "TTargetCardPositional",
+          "Origin": "Self",
+          "TargetMode": "Neighbor",
+          "IncludeOrigin": false,
+          "Conditions": {
+            "$type": "TCardConditionalCanCrit",
+            "IsNot": false
+          }
+        }
+      },
+      "Prerequisites": null,
+      "InternalName": "Swash Buckle 1",
+      "InternalDescription": "Your items have +{aura.0}% Crit Chance.",
+      "MigrationData": "",
+      "VFXConfig": {
+        "VFXOverrideKey": null,
+        "VFXShouldPlay": true,
+        "VFXIsTakeover": false
+      },
+      "TranslationKey": "0d48b8db5917fbaaad6ace4015c09d34",
+      "WorksIn": "Anywhere"
+    },
+    "1": {
+      "Id": "1",
+      "ActiveIn": "HandOnly",
+      "Action": {
+        "$type": "TAuraActionCardModifyAttribute",
+        "AttributeType": "DamageAmount",
+        "Operation": "Add",
+        "Value": {
+          "$type": "TReferenceValueCardAttribute",
+          "Target": {
+            "$type": "TTargetCardPositional",
+            "Origin": "Self",
+            "TargetMode": "RightCard",
+            "IncludeOrigin": false,
+            "Conditions": null
+          },
+          "AttributeType": "CritChance",
+          "DefaultValue": 0,
+          "Modifier": null
+        },
+        "Target": {
+          "$type": "TTargetCardPositional",
+          "Origin": "Self",
+          "TargetMode": "RightCard",
+          "IncludeOrigin": false,
+          "Conditions": {
+            "$type": "TCardConditionalAnd",
+            "Conditions": [
+              {
+                "$type": "TCardConditionalOr",
+                "Conditions": [
+                  {
+                    "$type": "TCardConditionalTag",
+                    "Tags": ["Weapon"],
+                    "Operator": "Any"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "Prerequisites": null,
+      "InternalName": "Swash Buckle Left Damage",
+      "InternalDescription": "",
+      "MigrationData": "",
+      "VFXConfig": {
+        "VFXOverrideKey": null,
+        "VFXShouldPlay": true,
+        "VFXIsTakeover": false
+      },
+      "TranslationKey": "0d48b8db5917fbaaad6ace4015c09d34",
+      "WorksIn": "Anywhere"
+    },
+    "2": {
+      "Id": "2",
+      "ActiveIn": "HandOnly",
+      "Action": {
+        "$type": "TAuraActionCardModifyAttribute",
+        "AttributeType": "DamageAmount",
+        "Operation": "Add",
+        "Value": {
+          "$type": "TReferenceValueCardAttribute",
+          "Target": {
+            "$type": "TTargetCardPositional",
+            "Origin": "Self",
+            "TargetMode": "LeftCard",
+            "IncludeOrigin": false,
+            "Conditions": null
+          },
+          "AttributeType": "CritChance",
+          "DefaultValue": 0,
+          "Modifier": null
+        },
+        "Target": {
+          "$type": "TTargetCardPositional",
+          "Origin": "Self",
+          "TargetMode": "LeftCard",
+          "IncludeOrigin": false,
+          "Conditions": {
+            "$type": "TCardConditionalAnd",
+            "Conditions": [
+              {
+                "$type": "TCardConditionalOr",
+                "Conditions": [
+                  {
+                    "$type": "TCardConditionalTag",
+                    "Tags": ["Weapon"],
+                    "Operator": "Any"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "Prerequisites": null,
+      "InternalName": "Swash Buckle Right Damage",
+      "InternalDescription": "",
+      "MigrationData": "",
+      "VFXConfig": {
+        "VFXOverrideKey": null,
+        "VFXShouldPlay": true,
+        "VFXIsTakeover": false
+      },
+      "TranslationKey": "0d48b8db5917fbaaad6ace4015c09d34",
+      "WorksIn": "Anywhere"
+    },
+    "3": {
+      "Id": "3",
+      "ActiveIn": "HandOnly",
+      "Action": {
+        "$type": "TAuraActionCardModifyAttribute",
+        "AttributeType": "ShieldApplyAmount",
+        "Operation": "Add",
+        "Value": {
+          "$type": "TReferenceValueCardAttribute",
+          "Target": {
+            "$type": "TTargetCardPositional",
+            "Origin": "Self",
+            "TargetMode": "RightCard",
+            "IncludeOrigin": false,
+            "Conditions": null
+          },
+          "AttributeType": "CritChance",
+          "DefaultValue": 0,
+          "Modifier": null
+        },
+        "Target": {
+          "$type": "TTargetCardPositional",
+          "Origin": "Self",
+          "TargetMode": "RightCard",
+          "IncludeOrigin": false,
+          "Conditions": {
+            "$type": "TCardConditionalAnd",
+            "Conditions": [
+              {
+                "$type": "TCardConditionalOr",
+                "Conditions": [
+                  {
+                    "$type": "TCardConditionalHiddenTag",
+                    "Tags": ["Shield"],
+                    "Operator": "Any"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "Prerequisites": null,
+      "InternalName": "Swash Buckle Left Shield",
+      "InternalDescription": "",
+      "MigrationData": "",
+      "VFXConfig": {
+        "VFXOverrideKey": null,
+        "VFXShouldPlay": true,
+        "VFXIsTakeover": false
+      },
+      "TranslationKey": "0d48b8db5917fbaaad6ace4015c09d34",
+      "WorksIn": "Anywhere"
+    },
+    "4": {
+      "Id": "4",
+      "ActiveIn": "HandOnly",
+      "Action": {
+        "$type": "TAuraActionCardModifyAttribute",
+        "AttributeType": "ShieldApplyAmount",
+        "Operation": "Add",
+        "Value": {
+          "$type": "TReferenceValueCardAttribute",
+          "Target": {
+            "$type": "TTargetCardPositional",
+            "Origin": "Self",
+            "TargetMode": "LeftCard",
+            "IncludeOrigin": false,
+            "Conditions": null
+          },
+          "AttributeType": "CritChance",
+          "DefaultValue": 0,
+          "Modifier": null
+        },
+        "Target": {
+          "$type": "TTargetCardPositional",
+          "Origin": "Self",
+          "TargetMode": "LeftCard",
+          "IncludeOrigin": false,
+          "Conditions": {
+            "$type": "TCardConditionalAnd",
+            "Conditions": [
+              {
+                "$type": "TCardConditionalOr",
+                "Conditions": [
+                  {
+                    "$type": "TCardConditionalHiddenTag",
+                    "Tags": ["Shield"],
+                    "Operator": "Any"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "Prerequisites": null,
+      "InternalName": "Swash Buckle Right Shield",
+      "InternalDescription": "",
+      "MigrationData": "",
+      "VFXConfig": {
+        "VFXOverrideKey": null,
+        "VFXShouldPlay": true,
+        "VFXIsTakeover": false
+      },
+      "TranslationKey": "0d48b8db5917fbaaad6ace4015c09d34",
+      "WorksIn": "Anywhere"
+    },
+    "5": {
+      "Id": "5",
+      "ActiveIn": "HandOnly",
+      "Action": {
+        "$type": "TAuraActionCardModifyAttribute",
+        "AttributeType": "HealAmount",
+        "Operation": "Add",
+        "Value": {
+          "$type": "TReferenceValueCardAttribute",
+          "Target": {
+            "$type": "TTargetCardPositional",
+            "Origin": "Self",
+            "TargetMode": "RightCard",
+            "IncludeOrigin": false,
+            "Conditions": null
+          },
+          "AttributeType": "CritChance",
+          "DefaultValue": 0,
+          "Modifier": null
+        },
+        "Target": {
+          "$type": "TTargetCardPositional",
+          "Origin": "Self",
+          "TargetMode": "RightCard",
+          "IncludeOrigin": false,
+          "Conditions": {
+            "$type": "TCardConditionalAnd",
+            "Conditions": [
+              {
+                "$type": "TCardConditionalOr",
+                "Conditions": [
+                  {
+                    "$type": "TCardConditionalHiddenTag",
+                    "Tags": ["Heal"],
+                    "Operator": "Any"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "Prerequisites": null,
+      "InternalName": "Swash Buckle Left Heal",
+      "InternalDescription": "",
+      "MigrationData": "",
+      "VFXConfig": {
+        "VFXOverrideKey": null,
+        "VFXShouldPlay": true,
+        "VFXIsTakeover": false
+      },
+      "TranslationKey": "0d48b8db5917fbaaad6ace4015c09d34",
+      "WorksIn": "Anywhere"
+    },
+    "6": {
+      "Id": "6",
+      "ActiveIn": "HandOnly",
+      "Action": {
+        "$type": "TAuraActionCardModifyAttribute",
+        "AttributeType": "HealAmount",
+        "Operation": "Add",
+        "Value": {
+          "$type": "TReferenceValueCardAttribute",
+          "Target": {
+            "$type": "TTargetCardPositional",
+            "Origin": "Self",
+            "TargetMode": "LeftCard",
+            "IncludeOrigin": false,
+            "Conditions": null
+          },
+          "AttributeType": "CritChance",
+          "DefaultValue": 0,
+          "Modifier": null
+        },
+        "Target": {
+          "$type": "TTargetCardPositional",
+          "Origin": "Self",
+          "TargetMode": "LeftCard",
+          "IncludeOrigin": false,
+          "Conditions": {
+            "$type": "TCardConditionalAnd",
+            "Conditions": [
+              {
+                "$type": "TCardConditionalOr",
+                "Conditions": [
+                  {
+                    "$type": "TCardConditionalHiddenTag",
+                    "Tags": ["Heal"],
+                    "Operator": "Any"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "Prerequisites": null,
+      "InternalName": "Swash Buckle Right Heal",
+      "InternalDescription": "",
+      "MigrationData": "",
+      "VFXConfig": {
+        "VFXOverrideKey": null,
+        "VFXShouldPlay": true,
+        "VFXIsTakeover": false
+      },
+      "TranslationKey": "0d48b8db5917fbaaad6ace4015c09d34",
+      "WorksIn": "Anywhere"
+    }
+  }
+}

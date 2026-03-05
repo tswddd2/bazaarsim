@@ -1,0 +1,175 @@
+{
+  "$type": "TCardItem",
+  "Tiers": {
+    "Bronze": {
+      "Attributes": {
+        "CooldownMax": 4000,
+        "Multicast": 1,
+        "DamageAmount": 4,
+        "Custom_0": 4
+      },
+      "AbilityIds": ["0", "1"],
+      "AuraIds": [],
+      "TooltipIds": [0, 1]
+    },
+    "Silver": {
+      "Attributes": {
+        "DamageAmount": 8,
+        "Custom_0": 8
+      },
+      "AbilityIds": ["0", "1"],
+      "AuraIds": [],
+      "TooltipIds": [0, 1]
+    },
+    "Gold": {
+      "Attributes": {
+        "DamageAmount": 12,
+        "Custom_0": 12
+      },
+      "AbilityIds": ["0", "1"],
+      "AuraIds": [],
+      "TooltipIds": [0, 1]
+    },
+    "Diamond": {
+      "Attributes": {
+        "DamageAmount": 16,
+        "Custom_0": 16
+      },
+      "AbilityIds": ["0", "1"],
+      "AuraIds": [],
+      "TooltipIds": [0, 1]
+    }
+  },
+  "Transform": null,
+  "Quests": null,
+  "Type": "Item",
+  "Id": "d6819596-2601-4757-8b72-2d708971023d",
+  "Version": "5.0.0",
+  "InternalName": "Switchblade",
+  "InternalDescription": null,
+  "StartingTier": "Bronze",
+  "Size": "Small",
+  "Heroes": ["Vanessa"],
+  "Tags": ["Weapon"],
+  "HiddenTags": ["Damage"],
+  "ArtKey": "6a5ba70201b80f140979adadaf831487",
+  "TranslationKey": "b780edf0e0a00b2b1669d7bfe42a16d7",
+  "AudioKey": "",
+  "Localization": {
+    "Title": {
+      "Key": "b780edf0e0a00b2b1669d7bfe42a16d7",
+      "Text": "Switchblade"
+    },
+    "Description": null,
+    "FlavorText": null,
+    "Tooltips": [
+      {
+        "Content": {
+          "Key": "9680b62e95401582cdd2ef6707691a26",
+          "Text": "Deal {ability.0} Damage"
+        },
+        "TooltipType": "Active",
+        "Prerequisites": null
+      },
+      {
+        "Content": {
+          "Key": "8ac36ba665215b6105e2ee0e460e2753",
+          "Text": "When you use an adjacent Weapon, it gains +{ability.1} Damage for the fight."
+        },
+        "TooltipType": "Passive",
+        "Prerequisites": null
+      }
+    ]
+  },
+  "Abilities": {
+    "0": {
+      "Id": "0",
+      "Trigger": {
+        "$type": "TTriggerOnCardFired"
+      },
+      "ActiveIn": "HandOnly",
+      "Action": {
+        "$type": "TActionPlayerDamage",
+        "ReferenceValue": null,
+        "Target": {
+          "$type": "TTargetPlayerRelative",
+          "TargetMode": "Opponent",
+          "Conditions": null
+        }
+      },
+      "Prerequisites": null,
+      "Priority": "Medium",
+      "InternalName": "Switchblade 1",
+      "InternalDescription": "Deal {ability.0} Damage.",
+      "MigrationData": "",
+      "VFXConfig": {
+        "VFXOverrideKey": "Assets/TheBazaar/Projectiles/Slash/VFX_Slash_Tier1_PV.prefab",
+        "VFXShouldPlay": true,
+        "VFXIsTakeover": false
+      },
+      "TranslationKey": "9680b62e95401582cdd2ef6707691a26",
+      "WorksIn": "Anywhere"
+    },
+    "1": {
+      "Id": "1",
+      "Trigger": {
+        "$type": "TTriggerOnItemUsed",
+        "Subject": {
+          "$type": "TTargetCardPositional",
+          "Origin": "Self",
+          "TargetMode": "Neighbor",
+          "IncludeOrigin": false,
+          "Conditions": {
+            "$type": "TCardConditionalOr",
+            "Conditions": [
+              {
+                "$type": "TCardConditionalTag",
+                "Tags": ["Weapon"],
+                "Operator": "Any"
+              }
+            ]
+          }
+        }
+      },
+      "ActiveIn": "HandOnly",
+      "Action": {
+        "$type": "TActionCardModifyAttribute",
+        "Value": {
+          "$type": "TReferenceValueCardAttribute",
+          "Target": {
+            "$type": "TTargetCardSelf",
+            "Conditions": null
+          },
+          "AttributeType": "Custom_0",
+          "DefaultValue": 0,
+          "Modifier": null
+        },
+        "AttributeType": "DamageAmount",
+        "Operation": "Add",
+        "Duration": {
+          "$type": "TDeterminantDuration",
+          "DurationType": "UntilEndOfCombat"
+        },
+        "TargetCount": null,
+        "Target": {
+          "$type": "TTargetCardTriggerSource",
+          "ExcludeSelf": false,
+          "Conditions": null
+        }
+      },
+      "Prerequisites": null,
+      "Priority": "Medium",
+      "InternalName": "Switchblade 2",
+      "InternalDescription": "When you use an adjacent Weapon, it gains +{ability.0} Damage for the fight.",
+      "MigrationData": "",
+      "VFXConfig": {
+        "VFXOverrideKey": null,
+        "VFXShouldPlay": true,
+        "VFXIsTakeover": false
+      },
+      "TranslationKey": "87f2b0645ae24042f657f5ffee3b2d12",
+      "WorksIn": "Anywhere"
+    }
+  },
+  "Auras": {}
+}
