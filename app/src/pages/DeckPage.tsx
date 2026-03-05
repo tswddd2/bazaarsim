@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import SearchBar from "../components/SearchBar";
-import ItemDeck, { getSlotSize, buildOccupancy } from "../components/ItemDeck";
-// canPlace removed – layout conflicts are now resolved by computeShiftedLayout inside ItemDeck
+import ItemDeck, {
+  getSlotSize,
+  computeOptimalLayout,
+} from "../components/ItemDeck";
 import type { DeckItem } from "../components/ItemDeck";
 import { useCards } from "../hooks/useCards";
 import type { CardItem } from "../types";
@@ -11,17 +13,54 @@ const TOTAL_SLOTS = 10;
 let uidCounter = 0;
 const DECK_STORAGE_KEY = "bazaarsim_deck";
 
-/** Find the first contiguous run of free slots that fits slotSize. */
-function findFirstAvailableSlot(items: DeckItem[], slotSize: number): number | null {
-  const occupied = buildOccupancy(items);
-  for (let start = 0; start <= TOTAL_SLOTS - slotSize; start++) {
-    let fits = true;
-    for (let i = 0; i < slotSize; i++) {
-      if (occupied[start + i]) { fits = false; break; }
+/**
+ * Calculates the total displacement of items between two layouts.
+ */
+function calculateDisplacement(
+  oldLayout: DeckItem[],
+  newLayout: DeckItem[]
+): number {
+  let totalDistance = 0;
+  const oldMap = new Map(oldLayout.map((item) => [item.uid, item]));
+
+  for (const newItem of newLayout) {
+    const oldItem = oldMap.get(newItem.uid);
+    if (oldItem) {
+      totalDistance += Math.abs(newItem.startSlot - oldItem.startSlot);
     }
-    if (fits) return start;
   }
-  return null;
+  return totalDistance;
+}
+
+/**
+ * Finds the best slot to add a new item to, minimizing displacement of existing items.
+ */
+function findBestSlotForCard(
+  deckItems: DeckItem[],
+  newCard: CardItem
+): DeckItem[] | null {
+  const slotSize = getSlotSize(newCard);
+  const tempUid = "temp-new-item";
+  let bestLayout: DeckItem[] | null = null;
+  let minDisplacement = Infinity;
+
+  // Iterate over all possible start slots
+  for (let startSlot = 0; startSlot <= TOTAL_SLOTS - slotSize; startSlot++) {
+    const newLayout = computeOptimalLayout(deckItems, tempUid, startSlot, {
+      card: newCard,
+      slotSize,
+    });
+
+    if (newLayout) {
+      const displacement = calculateDisplacement(deckItems, newLayout);
+      if (displacement < minDisplacement) {
+        minDisplacement = displacement;
+        bestLayout = newLayout;
+      }
+    }
+  }
+
+  return bestLayout;
 }
 
 const loadDeckFromStorage = (): DeckItem[] => {
@@ -61,16 +100,19 @@ export default function DeckPage() {
   const itemCards = cards.filter((c) => c.Type === "Item");
 
   const handleAddItem = useCallback((card: CardItem) => {
-    const slotSize = getSlotSize(card);
     setDeckItems((prev) => {
-      const startSlot = findFirstAvailableSlot(prev, slotSize);
-      if (startSlot === null) {
+      const bestLayout = findBestSlotForCard(prev, card);
+      if (bestLayout === null) {
         setShowFullWarning(true);
         setTimeout(() => setShowFullWarning(false), 3000);
-        return prev; // No contiguous space available
+        return prev; // No space available
       }
-      const uid = `deck-${++uidCounter}`;
-      return [...prev, { uid, card, slotSize, startSlot }];
+      // Replace the temp UID with a real one
+      return bestLayout.map((item) =>
+        item.uid === "temp-new-item"
+          ? { ...item, uid: `deck-${++uidCounter}` }
+          : item
+      );
     });
   }, []);
 
@@ -93,7 +135,9 @@ export default function DeckPage() {
         <h1>Bazaar Battle Simulator</h1>
         <p className="subtitle">Build your item deck and simulate battles</p>
         <nav className="header-nav">
-          <Link to="/cards" className="nav-link">Card Database</Link>
+          <Link to="/cards" className="nav-link">
+            Card Database
+          </Link>
         </nav>
       </header>
 
@@ -110,7 +154,9 @@ export default function DeckPage() {
                 placeholder="Search items to add to deck..."
               />
               {showFullWarning && (
-                <div className="deck-full-warning">Not enough room in deck!</div>
+                <div className="deck-full-warning">
+                  Not enough room in deck!
+                </div>
               )}
             </div>
 

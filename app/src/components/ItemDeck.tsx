@@ -38,20 +38,19 @@ function buildOccupancy(items: DeckItem[], excludeUid?: string): boolean[] {
 
 /**
  * Compute a new full layout where the dragged item is placed at targetStart
- * and all other items are shifted left/right to make room.
+ * and all other items are shifted to make room, minimizing total displacement.
  *
- * - Items whose midpoint is left of the dragged item's midpoint are packed
- *   flush against its left edge.
- * - Items whose midpoint is right are packed flush against its right edge.
- *
- * Returns null when the items physically cannot all fit in TOTAL_SLOTS.
+ * Returns null when the items physically cannot all fit.
  */
-function computeShiftedLayout(
+function computeOptimalLayout(
   items: DeckItem[],
   dragUid: string,
-  targetStart: number
+  targetStart: number,
+  newItem?: Omit<DeckItem, "uid" | "startSlot">
 ): DeckItem[] | null {
-  const dragItem = items.find((i) => i.uid === dragUid);
+  const dragItem = newItem
+    ? { ...newItem, uid: dragUid, startSlot: -1 }
+    : items.find((i) => i.uid === dragUid);
   if (!dragItem) return null;
 
   const clampedTarget = Math.min(
@@ -63,59 +62,164 @@ function computeShiftedLayout(
     .filter((i) => i.uid !== dragUid)
     .sort((a, b) => a.startSlot - b.startSlot);
 
-  // Split by whether an item's centre sits left or right of the dragged item's centre
-  const dragMid = clampedTarget + dragItem.slotSize / 2;
+  const dragEnd = clampedTarget + dragItem.slotSize;
 
-  const leftGroup = others.filter((i) => i.startSlot + i.slotSize / 2 <= dragMid);
-  const rightGroup = others.filter((i) => i.startSlot + i.slotSize / 2 > dragMid);
+  // Items that are now overlapping with the dragged item's target position
+  const colliding = others.filter(
+    (i) => i.startSlot < dragEnd && i.startSlot + i.slotSize > clampedTarget
+  );
 
-  // Feasibility check
-  const leftTotal = leftGroup.reduce((s, i) => s + i.slotSize, 0);
-  const rightTotal = rightGroup.reduce((s, i) => s + i.slotSize, 0);
+  // Items that are not overlapping
+  const nonColliding = others.filter(
+    (i) => !(i.startSlot < dragEnd && i.startSlot + i.slotSize > clampedTarget)
+  );
 
-  if (leftTotal > clampedTarget) return null;
-  if (rightTotal > TOTAL_SLOTS - clampedTarget - dragItem.slotSize) return null;
+  const occupiedSlots = new Array(TOTAL_SLOTS).fill(false);
+  for (const item of nonColliding) {
+    for (let i = 0; i < item.slotSize; i++) {
+      occupiedSlots[item.startSlot + i] = true;
+    }
+  }
+  // Mark dragged item's slots as occupied for collision detection
+  for (let i = 0; i < dragItem.slotSize; i++) {
+    occupiedSlots[clampedTarget + i] = true;
+  }
 
-  // Pack left group right-aligned against the dragged item's left edge
-  let cursor = clampedTarget;
-  const newLeft = [...leftGroup].reverse().map((item) => {
-    cursor -= item.slotSize;
-    return { ...item, startSlot: cursor };
-  });
-  newLeft.reverse();
+  // Recursive function to find a valid placement for a list of items
+  function solve(
+    itemsToPlace: DeckItem[],
+    occupied: boolean[]
+  ): DeckItem[] | null {
+    if (itemsToPlace.length === 0) return [];
 
-  // Pack right group left-aligned against the dragged item's right edge
-  cursor = clampedTarget + dragItem.slotSize;
-  const newRight = rightGroup.map((item) => {
-    const result = { ...item, startSlot: cursor };
-    cursor += item.slotSize;
-    return result;
-  });
+    const [currentItem, ...remainingItems] = itemsToPlace;
+    const originalPos = currentItem.startSlot;
 
-  return [...newLeft, { ...dragItem, startSlot: clampedTarget }, ...newRight];
+    // Try to place to the right
+    for (
+      let pos = originalPos;
+      pos <= TOTAL_SLOTS - currentItem.slotSize;
+      pos++
+    ) {
+      let canPlace = true;
+      for (let i = 0; i < currentItem.slotSize; i++) {
+        if (occupied[pos + i]) {
+          canPlace = false;
+          break;
+        }
+      }
+      if (canPlace) {
+        const newOccupied = [...occupied];
+        for (let i = 0; i < currentItem.slotSize; i++)
+          newOccupied[pos + i] = true;
+        const solution = solve(remainingItems, newOccupied);
+        if (solution !== null) {
+          return [{ ...currentItem, startSlot: pos }, ...solution];
+        }
+      }
+    }
+
+    // Try to place to the left
+    for (let pos = originalPos - 1; pos >= 0; pos--) {
+      let canPlace = true;
+      for (let i = 0; i < currentItem.slotSize; i++) {
+        if (occupied[pos + i]) {
+          canPlace = false;
+          break;
+        }
+      }
+      if (canPlace) {
+        const newOccupied = [...occupied];
+        for (let i = 0; i < currentItem.slotSize; i++)
+          newOccupied[pos + i] = true;
+        const solution = solve(remainingItems, newOccupied);
+        if (solution !== null) {
+          return [{ ...currentItem, startSlot: pos }, ...solution];
+        }
+      }
+    }
+    return null;
+  }
+
+  const collidingSolution = solve(colliding, occupiedSlots);
+
+  if (collidingSolution === null) return null;
+
+  const finalLayout = [
+    ...nonColliding,
+    ...collidingSolution,
+    { ...dragItem, startSlot: clampedTarget },
+  ].sort((a, b) => a.startSlot - b.startSlot);
+
+  // Final check for overlaps and total size
+  const totalSize = finalLayout.reduce((sum, i) => sum + i.slotSize, 0);
+  if (totalSize > TOTAL_SLOTS) return null;
+
+  for (let i = 0; i < finalLayout.length - 1; i++) {
+    if (
+      finalLayout[i].startSlot + finalLayout[i].slotSize >
+      finalLayout[i + 1].startSlot
+    ) {
+      return null; // Overlap detected
+    }
+  }
+
+  return finalLayout;
 }
 
-export { getSlotSize, buildOccupancy };
+/**
+ * Finds the best layout by trying the target slot, and if that fails,
+ * searching outwards for the nearest slot that works.
+ */
+function findNearestValidLayout(
+  items: DeckItem[],
+  dragUid: string,
+  targetSlot: number
+): DeckItem[] | null {
+  let layout = computeOptimalLayout(items, dragUid, targetSlot);
+  if (layout) return layout;
+
+  const dragItem = items.find((i) => i.uid === dragUid);
+  if (!dragItem) return null;
+
+  // Search outwards from the target slot
+  for (let offset = 1; offset < TOTAL_SLOTS; offset++) {
+    // Check right
+    const rightSlot = targetSlot + offset;
+    if (rightSlot <= TOTAL_SLOTS - dragItem.slotSize) {
+      layout = computeOptimalLayout(items, dragUid, rightSlot);
+      if (layout) return layout;
+    }
+    // Check left
+    const leftSlot = targetSlot - offset;
+    if (leftSlot >= 0) {
+      layout = computeOptimalLayout(items, dragUid, leftSlot);
+      if (layout) return layout;
+    }
+  }
+
+  return null;
+}
+
+export { getSlotSize, buildOccupancy, computeOptimalLayout };
 export type { DeckItem };
 
-export default function ItemDeck({ items, onApplyLayout, onRemove }: ItemDeckProps) {
+export default function ItemDeck({
+  items,
+  onApplyLayout,
+  onRemove,
+}: ItemDeckProps) {
   const [dragUid, setDragUid] = useState<string | null>(null);
   const [hoverSlot, setHoverSlot] = useState<number | null>(null);
   const deckRef = useRef<HTMLDivElement>(null);
   const dragOutside = useRef(false);
 
-  const draggingItem = dragUid ? (items.find((i) => i.uid === dragUid) ?? null) : null;
   const usedSlots = items.reduce((sum, item) => sum + item.slotSize, 0);
 
-  const clampedHover =
-    hoverSlot !== null && draggingItem !== null
-      ? Math.min(hoverSlot, TOTAL_SLOTS - draggingItem.slotSize)
-      : hoverSlot;
-
-  // Live shifted layout – drives both the preview rendering and the drop commit
+  // Live layout – drives both the preview rendering and the drop commit
   const previewLayout =
-    dragUid !== null && clampedHover !== null
-      ? computeShiftedLayout(items, dragUid, clampedHover)
+    dragUid !== null && hoverSlot !== null
+      ? findNearestValidLayout(items, dragUid, hoverSlot)
       : null;
 
   const isValidPreview = previewLayout !== null;
@@ -197,7 +301,9 @@ export default function ItemDeck({ items, onApplyLayout, onRemove }: ItemDeckPro
     <div className="item-deck-wrapper">
       <div className="deck-header">
         <span className="deck-title">Item Deck</span>
-        <span className="deck-slot-count">{usedSlots} / {TOTAL_SLOTS} slots</span>
+        <span className="deck-slot-count">
+          {usedSlots} / {TOTAL_SLOTS} slots
+        </span>
       </div>
       <div
         ref={deckRef}
@@ -251,7 +357,8 @@ export default function ItemDeck({ items, onApplyLayout, onRemove }: ItemDeckPro
             >
               <div className="deck-item-inner">
                 <span className="deck-item-name">
-                  {item.card.Localization?.Title?.Text ?? item.card.InternalName}
+                  {item.card.Localization?.Title?.Text ??
+                    item.card.InternalName}
                 </span>
                 <span className="deck-item-size">{item.card.Size}</span>
               </div>
