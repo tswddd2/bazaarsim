@@ -7,16 +7,29 @@ export function useCards() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/cards.json")
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load cards.json: ${res.status}`);
+    Promise.all([
+      fetch("/cards.json").then((res) => {
+        if (!res.ok)
+          throw new Error(`Failed to load cards.json: ${res.status}`);
         return res.json();
-      })
-      .then((data: Record<string, CardItem[]> | CardItem[]) => {
-        const list = Array.isArray(data)
-          ? data
-          : Object.values(data).flat();
-        setCards(list);
+      }),
+      fetch("/blacklist.json").then((res) => {
+        if (!res.ok) {
+          if (res.status === 404) {
+            return [];
+          }
+          throw new Error(`Failed to load blacklist.json: ${res.status}`);
+        }
+        return res.json();
+      }),
+    ])
+      .then(([data, blacklist]) => {
+        const list = Array.isArray(data) ? data : Object.values(data).flat();
+        const blacklistedNames = new Set(blacklist);
+        const filteredList = list.filter(
+          (card) => !blacklistedNames.has(card.InternalName)
+        );
+        setCards(filteredList);
         setLoading(false);
       })
       .catch((err) => {
