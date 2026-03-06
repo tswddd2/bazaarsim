@@ -1,17 +1,23 @@
 import { useState, useRef, useCallback } from "react";
 import type { CardItem } from "../types";
 
-interface DeckItem {
+export interface DeckItem {
   uid: string; // unique instance id
   card: CardItem;
   slotSize: number; // 1, 2, or 3
   startSlot: number; // 0-indexed starting slot position
+  tier: string;
+  attributes: Record<string, number>;
+  abilityIds: string[];
+  tooltipIds: number[];
 }
 
 interface ItemDeckProps {
   items: DeckItem[];
   onApplyLayout: (items: DeckItem[]) => void;
   onRemove: (uid: string) => void;
+  onSelect?: (uid: string) => void;
+  selectedUid?: string;
 }
 
 const TOTAL_SLOTS = 10;
@@ -202,12 +208,13 @@ function findNearestValidLayout(
 }
 
 export { getSlotSize, buildOccupancy, computeOptimalLayout };
-export type { DeckItem };
 
 export default function ItemDeck({
   items,
   onApplyLayout,
   onRemove,
+  onSelect,
+  selectedUid,
 }: ItemDeckProps) {
   const [dragUid, setDragUid] = useState<string | null>(null);
   const [hoverSlot, setHoverSlot] = useState<number | null>(null);
@@ -340,16 +347,20 @@ export default function ItemDeck({
           return (
             <div
               key={item.uid}
+              onClick={onSelect ? () => onSelect(item.uid) : undefined}
               className={[
                 "deck-item",
                 `size-${item.slotSize}`,
+                `tier-${item.tier.toLowerCase()}`,
                 dragUid === item.uid ? "is-dragging" : "",
                 isShifted ? "is-shifting" : "",
+                selectedUid === item.uid ? "is-selected" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
               style={{
                 gridColumn: `${display.startSlot + 1} / span ${item.slotSize}`,
+                cursor: onSelect ? "pointer" : "grab",
               }}
               draggable
               onDragStart={(e) => handleDragStart(e, item.uid)}
@@ -360,7 +371,6 @@ export default function ItemDeck({
                   {item.card.Localization?.Title?.Text ??
                     item.card.InternalName}
                 </span>
-                <span className="deck-item-size">{item.card.Size}</span>
               </div>
             </div>
           );
