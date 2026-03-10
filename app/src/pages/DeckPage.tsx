@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import SearchBar from "../components/SearchBar";
 import ItemDeck, {
   getSlotSize,
-  computeOptimalLayout,
+  handleAddItemLayout,
 } from "../components/ItemDeck";
 import type { DeckItem } from "../components/ItemDeck";
 import { useCards } from "../hooks/useCards";
@@ -13,28 +13,8 @@ import {
   type BattleResult,
 } from "../simulation/cooldownManager";
 
-const TOTAL_SLOTS = 10;
 let uidCounter = 0;
 const DECK_STORAGE_KEY = "bazaarsim_deck";
-
-/**
- * Calculates the total displacement of items between two layouts.
- */
-function calculateDisplacement(
-  oldLayout: DeckItem[],
-  newLayout: DeckItem[]
-): number {
-  let totalDistance = 0;
-  const oldMap = new Map(oldLayout.map((item) => [item.uid, item]));
-
-  for (const newItem of newLayout) {
-    const oldItem = oldMap.get(newItem.uid);
-    if (oldItem) {
-      totalDistance += Math.abs(newItem.startSlot - oldItem.startSlot);
-    }
-  }
-  return totalDistance;
-}
 
 function computeTierData(card: CardItem, targetTier: string) {
   const tiers = Object.keys(card.Tiers || {});
@@ -68,16 +48,16 @@ function computeTierData(card: CardItem, targetTier: string) {
 }
 
 /**
- * Finds the best slot to add a new item to, minimizing displacement of existing items.
+ * Add a new item to the deck using the new directional shifting logic.
+ * First checks for continuous space at the leftmost position.
+ * If not available, places at leftmost and shifts overlapping items right.
  */
 function findBestSlotForCard(
   deckItems: DeckItem[],
   newCard: CardItem
 ): DeckItem[] | null {
   const slotSize = getSlotSize(newCard);
-  const tempUid = "temp-new-item";
-  let bestLayout: DeckItem[] | null = null;
-  let minDisplacement = Infinity;
+  const tempUid = `new-item-${++uidCounter}`;
 
   // Initialize tier and attributes
   const tiers = Object.keys(newCard.Tiers || {});
@@ -89,27 +69,15 @@ function findBestSlotForCard(
     startingTier
   );
 
-  // Iterate over all possible start slots
-  for (let startSlot = 0; startSlot <= TOTAL_SLOTS - slotSize; startSlot++) {
-    const newLayout = computeOptimalLayout(deckItems, tempUid, startSlot, {
-      card: newCard,
-      slotSize,
-      tier: startingTier,
-      attributes,
-      abilityIds,
-      tooltipIds,
-    });
-
-    if (newLayout) {
-      const displacement = calculateDisplacement(deckItems, newLayout);
-      if (displacement < minDisplacement) {
-        minDisplacement = displacement;
-        bestLayout = newLayout;
-      }
-    }
-  }
-
-  return bestLayout;
+  // Use the new add item layout logic
+  return handleAddItemLayout(deckItems, {
+    card: newCard,
+    slotSize,
+    tier: startingTier,
+    attributes,
+    abilityIds,
+    tooltipIds,
+  }, tempUid);
 }
 
 const loadDeckFromStorage = (): DeckItem[] => {

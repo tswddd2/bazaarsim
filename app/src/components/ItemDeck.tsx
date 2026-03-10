@@ -44,171 +44,252 @@ function buildOccupancy(items: DeckItem[], excludeUid?: string): boolean[] {
 }
 
 /**
- * Compute a new full layout where the dragged item is placed at targetStart
- * and all other items are shifted to make room, minimizing total displacement.
- *
- * Returns null when the items physically cannot all fit.
+ * Shift items to the right iteratively using a queue.
+ * Returns the adjusted layout or null if impossible.
  */
-function computeOptimalLayout(
+function shiftItemsRight(
   items: DeckItem[],
-  dragUid: string,
-  targetStart: number,
-  newItem?: Omit<DeckItem, "uid" | "startSlot">
-): DeckItem[] | null {
-  const dragItem = newItem
-    ? { ...newItem, uid: dragUid, startSlot: -1 }
-    : items.find((i) => i.uid === dragUid);
-  if (!dragItem) return null;
+  initialOverlaps: { item: DeckItem; pushedBy: number }[],
+  currentLayout: Map<string, DeckItem>
+): Map<string, DeckItem> | null {
+  const layout = new Map(currentLayout);
+  const queue = [...initialOverlaps];
 
-  const clampedTarget = Math.min(
-    Math.max(0, targetStart),
-    TOTAL_SLOTS - dragItem.slotSize
-  );
-
-  const others = items
-    .filter((i) => i.uid !== dragUid)
-    .sort((a, b) => a.startSlot - b.startSlot);
-
-  const dragEnd = clampedTarget + dragItem.slotSize;
-
-  // Items that are now overlapping with the dragged item's target position
-  const colliding = others.filter(
-    (i) => i.startSlot < dragEnd && i.startSlot + i.slotSize > clampedTarget
-  );
-
-  // Items that are not overlapping
-  const nonColliding = others.filter(
-    (i) => !(i.startSlot < dragEnd && i.startSlot + i.slotSize > clampedTarget)
-  );
-
-  const occupiedSlots = new Array(TOTAL_SLOTS).fill(false);
-  for (const item of nonColliding) {
-    for (let i = 0; i < item.slotSize; i++) {
-      occupiedSlots[item.startSlot + i] = true;
+  while (queue.length > 0) {
+    const { item, pushedBy } = queue.shift()!;
+    
+    // Set position to [xB, yB] where xB = yA (pushedBy)
+    const newPos = pushedBy;
+    if (newPos + item.slotSize > TOTAL_SLOTS) {
+      return null; // Cannot shift right, out of bounds
     }
-  }
-  // Mark dragged item's slots as occupied for collision detection
-  for (let i = 0; i < dragItem.slotSize; i++) {
-    occupiedSlots[clampedTarget + i] = true;
-  }
 
-  // Recursive function to find a valid placement for a list of items
-  function solve(
-    itemsToPlace: DeckItem[],
-    occupied: boolean[]
-  ): DeckItem[] | null {
-    if (itemsToPlace.length === 0) return [];
-
-    const [currentItem, ...remainingItems] = itemsToPlace;
-    const originalPos = currentItem.startSlot;
-
-    // Try to place to the right
-    for (
-      let pos = originalPos;
-      pos <= TOTAL_SLOTS - currentItem.slotSize;
-      pos++
-    ) {
-      let canPlace = true;
-      for (let i = 0; i < currentItem.slotSize; i++) {
-        if (occupied[pos + i]) {
-          canPlace = false;
-          break;
-        }
-      }
-      if (canPlace) {
-        const newOccupied = [...occupied];
-        for (let i = 0; i < currentItem.slotSize; i++)
-          newOccupied[pos + i] = true;
-        const solution = solve(remainingItems, newOccupied);
-        if (solution !== null) {
-          return [{ ...currentItem, startSlot: pos }, ...solution];
-        }
+    // Check what's at the new position
+    for (const [uid, other] of layout) {
+      if (uid === item.uid) continue;
+      if (
+        other.startSlot < newPos + item.slotSize &&
+        other.startSlot + other.slotSize > newPos
+      ) {
+        queue.push({ item: other, pushedBy: newPos + item.slotSize });
       }
     }
 
-    // Try to place to the left
-    for (let pos = originalPos - 1; pos >= 0; pos--) {
-      let canPlace = true;
-      for (let i = 0; i < currentItem.slotSize; i++) {
-        if (occupied[pos + i]) {
-          canPlace = false;
-          break;
-        }
-      }
-      if (canPlace) {
-        const newOccupied = [...occupied];
-        for (let i = 0; i < currentItem.slotSize; i++)
-          newOccupied[pos + i] = true;
-        const solution = solve(remainingItems, newOccupied);
-        if (solution !== null) {
-          return [{ ...currentItem, startSlot: pos }, ...solution];
-        }
-      }
-    }
-    return null;
+    layout.set(item.uid, { ...item, startSlot: newPos });
   }
 
-  const collidingSolution = solve(colliding, occupiedSlots);
-
-  if (collidingSolution === null) return null;
-
-  const finalLayout = [
-    ...nonColliding,
-    ...collidingSolution,
-    { ...dragItem, startSlot: clampedTarget },
-  ].sort((a, b) => a.startSlot - b.startSlot);
-
-  // Final check for overlaps and total size
-  const totalSize = finalLayout.reduce((sum, i) => sum + i.slotSize, 0);
-  if (totalSize > TOTAL_SLOTS) return null;
-
-  for (let i = 0; i < finalLayout.length - 1; i++) {
-    if (
-      finalLayout[i].startSlot + finalLayout[i].slotSize >
-      finalLayout[i + 1].startSlot
-    ) {
-      return null; // Overlap detected
-    }
-  }
-
-  return finalLayout;
+  return layout;
 }
 
 /**
- * Finds the best layout by trying the target slot, and if that fails,
- * searching outwards for the nearest slot that works.
+ * Shift items to the left iteratively using a queue.
+ * Returns the adjusted layout or null if impossible.
  */
-function findNearestValidLayout(
+function shiftItemsLeft(
+  items: DeckItem[],
+  initialOverlaps: { item: DeckItem; pushedBy: number }[],
+  currentLayout: Map<string, DeckItem>
+): Map<string, DeckItem> | null {
+  const layout = new Map(currentLayout);
+  const queue = [...initialOverlaps];
+
+  while (queue.length > 0) {
+    const { item, pushedBy } = queue.shift()!;
+    
+    // Set position to [xB, yB] where yB = xA (pushedBy)
+    const newPos = pushedBy - item.slotSize;
+    if (newPos < 0) {
+      return null; // Cannot shift left, out of bounds
+    }
+
+    // Check what's at the new position
+    for (const [uid, other] of layout) {
+      if (uid === item.uid) continue;
+      if (
+        other.startSlot < newPos + item.slotSize &&
+        other.startSlot + other.slotSize > newPos
+      ) {
+        queue.push({ item: other, pushedBy: newPos });
+      }
+    }
+
+    layout.set(item.uid, { ...item, startSlot: newPos });
+  }
+
+  return layout;
+}
+
+/**
+ * Handle drag repositioning with directional shifting logic.
+ * Dragging right: shift left items right. Dragging left: shift right items left.
+ * If right boundary overlaps partially, extend target to fully cover that item.
+ */
+function handleDragLayout(
   items: DeckItem[],
   dragUid: string,
-  targetSlot: number
+  targetStart: number
 ): DeckItem[] | null {
-  let layout = computeOptimalLayout(items, dragUid, targetSlot);
-  if (layout) return layout;
-
+  console.log("Handling drag layout for", dragUid, "to target slot", targetStart);
   const dragItem = items.find((i) => i.uid === dragUid);
   if (!dragItem) return null;
 
-  // Search outwards from the target slot
-  for (let offset = 1; offset < TOTAL_SLOTS; offset++) {
-    // Check right
-    const rightSlot = targetSlot + offset;
-    if (rightSlot <= TOTAL_SLOTS - dragItem.slotSize) {
-      layout = computeOptimalLayout(items, dragUid, rightSlot);
-      if (layout) return layout;
+  const clampedTarget = Math.max(0, Math.min(targetStart, TOTAL_SLOTS - dragItem.slotSize));
+  const currentPos = dragItem.startSlot;
+
+  if (clampedTarget === currentPos) {
+    // No movement needed
+    return items;
+  }
+
+  const layout = new Map(items.map((i) => [i.uid, i]));
+  const dragEnd = clampedTarget + dragItem.slotSize;
+
+  if (clampedTarget > currentPos) {
+    // Dragging RIGHT
+    let finalTarget = clampedTarget;
+
+    // Check if right boundary partially overlaps with any item
+    // If so, extend target to fully cover that item
+    for (const item of items) {
+      if (item.uid === dragUid) continue;
+      // If right edge of dragged item falls within this item
+      if (
+        dragEnd > item.startSlot &&
+        dragEnd < item.startSlot + item.slotSize
+      ) {
+        // Extend target to cover the entire item
+        finalTarget = item.startSlot + item.slotSize - dragItem.slotSize;
+        console.log("Adjusting right drag target to", finalTarget);
+        break;
+      }
     }
-    // Check left
-    const leftSlot = targetSlot - offset;
-    if (leftSlot >= 0) {
-      layout = computeOptimalLayout(items, dragUid, leftSlot);
-      if (layout) return layout;
+
+    finalTarget = Math.max(
+      clampedTarget,
+      Math.min(finalTarget, TOTAL_SLOTS - dragItem.slotSize)
+    );
+    const finalDragEnd = finalTarget + dragItem.slotSize;
+
+    // Find items to shift left (those that overlap with the new dragged position)
+    const toShiftLeft: { item: DeckItem; pushedBy: number }[] = [];
+    for (const item of items) {
+      if (item.uid === dragUid) continue;
+      if (item.startSlot < finalDragEnd && item.startSlot + item.slotSize > finalTarget) {
+        toShiftLeft.push({ item, pushedBy: finalTarget });
+      }
+    }
+    console.log("Shifting left items", toShiftLeft.map((i) => i.item.uid), "to accommodate right drag");
+
+    // Place dragged item at final position
+    layout.set(dragUid, { ...dragItem, startSlot: finalTarget });
+
+    // Shift left items to the left
+    if (toShiftLeft.length > 0) {
+      const result = shiftItemsLeft(items, toShiftLeft, layout);
+      if (!result) return null;
+      return Array.from(result.values());
+    }
+
+    return Array.from(layout.values());
+  } else {
+    // Dragging LEFT
+    let finalTarget = clampedTarget;
+
+    // Check if left boundary partially overlaps with any item
+    // If so, adjust target to fully cover that item
+    for (const item of items) {
+      if (item.uid === dragUid) continue;
+      // If left edge of dragged item falls within this item
+      if (
+        clampedTarget > item.startSlot &&
+        clampedTarget < item.startSlot + item.slotSize
+      ) {
+        // Adjust target to start at this item's beginning
+        finalTarget = item.startSlot;
+        break;
+      }
+    }
+
+    finalTarget = Math.max(0, Math.min(finalTarget, TOTAL_SLOTS - dragItem.slotSize));
+    const finalDragEnd = finalTarget + dragItem.slotSize;
+
+    // Find items to shift right (those that overlap with the new dragged position)
+    const toShiftRight: { item: DeckItem; pushedBy: number }[] = [];
+    for (const item of items) {
+      if (item.uid === dragUid) continue;
+      if (item.startSlot < finalDragEnd && item.startSlot + item.slotSize > finalTarget) {
+        toShiftRight.push({ item, pushedBy: finalDragEnd });
+      }
+    }
+
+    // Place dragged item at final position
+    layout.set(dragUid, { ...dragItem, startSlot: finalTarget });
+
+    // Shift right items to the right
+    if (toShiftRight.length > 0) {
+      const result = shiftItemsRight(items, toShiftRight, layout);
+      if (!result) return null;
+      return Array.from(result.values());
+    }
+
+    return Array.from(layout.values());
+  }
+}
+
+/**
+ * Handle adding a new item to the deck.
+ * First tries to find continuous space at the leftmost position.
+ * If no space found, places at leftmost and shifts overlapping items right.
+ */
+function handleAddItemLayout(
+  items: DeckItem[],
+  newItem: Omit<DeckItem, "uid" | "startSlot">,
+  uid: string
+): DeckItem[] | null {
+  const requiredSize = newItem.slotSize;
+
+  // Find leftmost continuous space of required size
+  for (let pos = 0; pos <= TOTAL_SLOTS - requiredSize; pos++) {
+    let isAvailable = true;
+    for (const item of items) {
+      if (item.startSlot < pos + requiredSize && item.startSlot + item.slotSize > pos) {
+        isAvailable = false;
+        break;
+      }
+    }
+    if (isAvailable) {
+      // Found continuous space, add item here
+      return [...items, { ...newItem, uid, startSlot: pos }];
     }
   }
 
-  return null;
+  // No continuous space found, place at leftmost (position 0) and shift right
+  const layout = new Map(items.map((i) => [i.uid, i]));
+  const newItemPos = 0;
+  const newItemEnd = newItemPos + requiredSize;
+
+  // Find items that overlap with position 0 to requiredSize
+  const toShiftRight: { item: DeckItem; pushedBy: number }[] = [];
+  for (const item of items) {
+    if (item.startSlot < newItemEnd && item.startSlot + item.slotSize > newItemPos) {
+      toShiftRight.push({ item, pushedBy: newItemEnd });
+    }
+  }
+
+  // Add the new item
+  layout.set(uid, { ...newItem, uid, startSlot: newItemPos });
+
+  // Shift overlapping items right
+  if (toShiftRight.length > 0) {
+    const result = shiftItemsRight(items, toShiftRight, layout);
+    if (!result) return null;
+    return Array.from(result.values());
+  }
+
+  return Array.from(layout.values());
 }
 
-export { getSlotSize, buildOccupancy, computeOptimalLayout };
+export { getSlotSize, buildOccupancy, handleDragLayout, handleAddItemLayout };
 
 export default function ItemDeck({
   items,
@@ -228,7 +309,7 @@ export default function ItemDeck({
   // Live layout – drives both the preview rendering and the drop commit
   const previewLayout =
     dragUid !== null && hoverSlot !== null
-      ? findNearestValidLayout(items, dragUid, hoverSlot)
+      ? handleDragLayout(items, dragUid, hoverSlot)
       : null;
 
   const isValidPreview = previewLayout !== null;
