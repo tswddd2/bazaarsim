@@ -1,5 +1,8 @@
 import type { DeckItem } from "../components/ItemDeck";
-import { triggerAbility } from "./triggerHandler.ts";
+import {
+  triggerAbility,
+  triggerOnItemUsedAbilities,
+} from "./triggerHandler.ts";
 
 export interface CooldownState {
   uid: string;
@@ -123,7 +126,21 @@ export function simulateBattle(
           damage,
         });
       }
-      // TODO: Add critical hit logic when crit mechanics are implemented
+
+      // Every TTriggerOnCardFired activation also triggers TTriggerOnItemUsed listeners.
+      const itemUsedResults = triggerOnItemUsedAbilities(
+        items,
+        event.itemFired
+      );
+      for (const itemUsedResult of itemUsedResults) {
+        result.totalDamage += itemUsedResult.damage;
+        result.totalHits += 1;
+        result.cardEvents.push({
+          time: state.timeElapsed / 1000,
+          uid: itemUsedResult.item.uid,
+          damage: itemUsedResult.damage,
+        });
+      }
     }
 
     // Record cumulative damage at this time
