@@ -18,6 +18,7 @@ interface ItemDeckProps {
   onRemove: (uid: string) => void;
   onSelect?: (uid: string) => void;
   selectedUid?: string;
+  isSimulating?: boolean;
 }
 
 const TOTAL_SLOTS = 10;
@@ -215,6 +216,7 @@ export default function ItemDeck({
   onRemove,
   onSelect,
   selectedUid,
+  isSimulating,
 }: ItemDeckProps) {
   const [dragUid, setDragUid] = useState<string | null>(null);
   const [hoverSlot, setHoverSlot] = useState<number | null>(null);
@@ -236,13 +238,20 @@ export default function ItemDeck({
     ? new Map(previewLayout.map((item) => [item.uid, item]))
     : null;
 
-  const handleDragStart = useCallback((e: React.DragEvent, uid: string) => {
-    setDragUid(uid);
-    dragOutside.current = false;
-    e.dataTransfer.effectAllowed = "move";
-    const el = e.currentTarget as HTMLElement;
-    e.dataTransfer.setDragImage(el, el.offsetWidth / 2, el.offsetHeight / 2);
-  }, []);
+  const handleDragStart = useCallback(
+    (e: React.DragEvent, uid: string) => {
+      if (isSimulating) {
+        e.preventDefault();
+        return;
+      }
+      setDragUid(uid);
+      dragOutside.current = false;
+      e.dataTransfer.effectAllowed = "move";
+      const el = e.currentTarget as HTMLElement;
+      e.dataTransfer.setDragImage(el, el.offsetWidth / 2, el.offsetHeight / 2);
+    },
+    [isSimulating]
+  );
 
   const handleDeckDragOver = useCallback(
     (e: React.DragEvent) => {
@@ -355,14 +364,19 @@ export default function ItemDeck({
                 dragUid === item.uid ? "is-dragging" : "",
                 isShifted ? "is-shifting" : "",
                 selectedUid === item.uid ? "is-selected" : "",
+                isSimulating ? "is-simulating" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
               style={{
                 gridColumn: `${display.startSlot + 1} / span ${item.slotSize}`,
-                cursor: onSelect ? "pointer" : "grab",
+                cursor: onSelect
+                  ? "pointer"
+                  : isSimulating
+                  ? "default"
+                  : "grab",
               }}
-              draggable
+              draggable={!isSimulating}
               onDragStart={(e) => handleDragStart(e, item.uid)}
               onDragEnd={handleDragEnd}
             >

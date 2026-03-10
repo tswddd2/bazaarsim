@@ -5,9 +5,15 @@ interface SearchBarProps {
   cards: CardItem[];
   onSelect: (card: CardItem) => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
-export default function SearchBar({ cards, onSelect, placeholder }: SearchBarProps) {
+export default function SearchBar({
+  cards,
+  onSelect,
+  placeholder,
+  disabled,
+}: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CardItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -24,19 +30,17 @@ export default function SearchBar({ cards, onSelect, placeholder }: SearchBarPro
     }
     const lower = query.toLowerCase();
     const filtered = cards
-      .filter((c) =>
-        c.Localization?.Title?.Text?.toLowerCase().includes(lower)
-      )
+      .filter((c) => c.Localization?.Title?.Text?.toLowerCase().includes(lower))
       .sort((a, b) => {
         const aTitle = a.Localization?.Title?.Text?.toLowerCase() ?? "";
         const bTitle = b.Localization?.Title?.Text?.toLowerCase() ?? "";
         const aStartsWith = aTitle.startsWith(lower);
         const bStartsWith = bTitle.startsWith(lower);
-        
+
         // Prioritize prefix matches
         if (aStartsWith && !bStartsWith) return -1;
         if (!aStartsWith && bStartsWith) return 1;
-        
+
         // If both or neither start with query, maintain alphabetical order
         return aTitle.localeCompare(bTitle);
       });
@@ -86,7 +90,10 @@ export default function SearchBar({ cards, onSelect, placeholder }: SearchBarPro
   }
 
   return (
-    <div className="search-bar" ref={containerRef}>
+    <div
+      className={`search-bar ${disabled ? "disabled" : ""}`}
+      ref={containerRef}
+    >
       <div className="search-input-wrapper">
         <svg
           className="search-icon"
@@ -108,9 +115,10 @@ export default function SearchBar({ cards, onSelect, placeholder }: SearchBarPro
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => {
-            if (results.length > 0) setIsOpen(true);
+            if (results.length > 0 && !disabled) setIsOpen(true);
           }}
           onKeyDown={handleKeyDown}
+          disabled={disabled}
         />
       </div>
       {isOpen && results.length > 0 && (
