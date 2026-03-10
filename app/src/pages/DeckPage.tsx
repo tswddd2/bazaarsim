@@ -8,6 +8,10 @@ import ItemDeck, {
 import type { DeckItem } from "../components/ItemDeck";
 import { useCards } from "../hooks/useCards";
 import type { CardItem } from "../types";
+import {
+  simulateBattle,
+  type BattleResult,
+} from "../simulation/cooldownManager";
 
 const TOTAL_SLOTS = 10;
 let uidCounter = 0;
@@ -159,30 +163,41 @@ export default function DeckPage() {
   const [deckItems, setDeckItems] = useState<DeckItem[]>(loadDeckFromStorage);
   const [showFullWarning, setShowFullWarning] = useState(false);
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationTime, setSimulationTime] = useState(0);
+  const [battleResult, setBattleResult] = useState<BattleResult | null>(null);
 
   // Filter to items only (not skills, encounters, etc.)
   const itemCards = cards.filter((c) => c.Type === "Item");
 
-  const handleAddItem = useCallback((card: CardItem) => {
-    setDeckItems((prev) => {
-      const bestLayout = findBestSlotForCard(prev, card);
-      if (bestLayout === null) {
-        setShowFullWarning(true);
-        setTimeout(() => setShowFullWarning(false), 3000);
-        return prev; // No space available
-      }
-      // Replace the temp UID with a real one
-      return bestLayout.map((item) =>
-        item.uid === "temp-new-item"
-          ? { ...item, uid: `deck-${++uidCounter}` }
-          : item
-      );
-    });
-  }, []);
+  const handleAddItem = useCallback(
+    (card: CardItem) => {
+      if (isSimulating) return; // Prevent adding items during simulation
+      setDeckItems((prev) => {
+        const bestLayout = findBestSlotForCard(prev, card);
+        if (bestLayout === null) {
+          setShowFullWarning(true);
+          setTimeout(() => setShowFullWarning(false), 3000);
+          return prev; // No space available
+        }
+        // Replace the temp UID with a real one
+        return bestLayout.map((item) =>
+          item.uid === "temp-new-item"
+            ? { ...item, uid: `deck-${++uidCounter}` }
+            : item
+        );
+      });
+    },
+    [isSimulating]
+  );
 
-  const handleApplyLayout = useCallback((newItems: DeckItem[]) => {
-    setDeckItems(newItems);
-  }, []);
+  const handleApplyLayout = useCallback(
+    (newItems: DeckItem[]) => {
+      if (isSimulating) return; // Prevent dragging/rearranging items during simulation
+      setDeckItems(newItems);
+    },
+    [isSimulating]
+  );
 
   const handleUpdateItemTier = useCallback((uid: string, newTier: string) => {
     setDeckItems((prev) =>
@@ -216,10 +231,14 @@ export default function DeckPage() {
     []
   );
 
-  const handleRemove = useCallback((uid: string) => {
-    setDeckItems((prev) => prev.filter((item) => item.uid !== uid));
-    setSelectedUid((prev) => (prev === uid ? null : prev));
-  }, []);
+  const handleRemove = useCallback(
+    (uid: string) => {
+      if (isSimulating) return; // Prevent removing items during simulation
+      setDeckItems((prev) => prev.filter((item) => item.uid !== uid));
+      setSelectedUid((prev) => (prev === uid ? null : prev));
+    },
+    [isSimulating]
+  );
 
   // Save deck to localStorage whenever it changes
   useEffect(() => {
@@ -227,6 +246,53 @@ export default function DeckPage() {
   }, [deckItems]);
 
   const selectedItem = deckItems.find((item) => item.uid === selectedUid);
+
+  const handleToggleSimulation = useCallback(() => {
+    if (isSimulating) {
+      setIsSimulating(false);
+      return;
+    }
+
+    // Run the full battle simulation
+    const result = simulateBattle(deckItems, 20); // Simulate 20 seconds
+    setBattleResult(result);
+    setIsSimulating(true);
+    setSimulationTime(0);
+    setSelectedUid(null); // Close item detail panel when simulating
+  }, [deckItems, isSimulating]);
+
+  // Get damage at the current simulation time
+  const getDamageAtTime = (time: number): number => {
+    if (!battleResult) return 0;
+
+    // Find the damage at the closest time point
+    const closestPoint = battleResult.damageOverTime.reduce((prev, curr) => {
+      return Math.abs(curr.time - time) < Math.abs(prev.time - time)
+        ? curr
+        : prev;
+    });
+
+    return closestPoint.cumulativeDamage;
+  };
+
+  const totalDamage = getDamageAtTime(simulationTime);
+  const selectedSimulationItem = deckItems.find(
+    (item) => item.uid === selectedUid
+  );
+  const selectedItemStats = battleResult
+    ? battleResult.cardEvents
+        .filter(
+          (event) => event.uid === selectedUid && event.time <= simulationTime
+        )
+        .reduce(
+          (acc, event) => {
+            acc.hits += 1;
+            acc.damage += event.damage;
+            return acc;
+          },
+          { hits: 0, damage: 0 }
+        )
+    : { hits: 0, damage: 0 };
 
   return (
     <div className="app deck-page">
@@ -251,7 +317,15 @@ export default function DeckPage() {
                 cards={itemCards}
                 onSelect={handleAddItem}
                 placeholder="Search items to add to deck..."
+                disabled={isSimulating}
               />
+              <button
+                className={`simulate-button ${isSimulating ? "active" : ""}`}
+                onClick={handleToggleSimulation}
+                disabled={deckItems.length === 0}
+              >
+                {isSimulating ? "Hide Simulation" : "Simulate"}
+              </button>
               {showFullWarning && (
                 <div className="deck-full-warning">
                   Not enough room in deck!
@@ -265,9 +339,89 @@ export default function DeckPage() {
               onRemove={handleRemove}
               onSelect={setSelectedUid}
               selectedUid={selectedUid || undefined}
+              isSimulating={isSimulating}
             />
 
-            {selectedItem && (
+            {isSimulating && (
+              <div className="simulation-panel">
+                <div className="panel-header">
+                  <h3 className="panel-title">Battle Simulation</h3>
+                </div>
+                <div className="simulation-controls">
+                  <label className="simulation-label">
+                    Time: {simulationTime.toFixed(1)}s
+                  </label>
+                  <input
+                    type="range"
+                    className="simulation-slider"
+                    min="0"
+                    max="20"
+                    step="0.5"
+                    value={simulationTime}
+                    onChange={(e) =>
+                      setSimulationTime(parseFloat(e.target.value))
+                    }
+                  />
+                  <div className="simulation-time-markers">
+                    <span>0s</span>
+                    <span>5s</span>
+                    <span>10s</span>
+                    <span>15s</span>
+                    <span>20s</span>
+                  </div>
+                </div>
+                <div className="panel-body simulation-body">
+                  <div className="simulation-layout">
+                    <div className="simulation-stats">
+                      <div className="stat-card">
+                        <div className="stat-label">Total Damage</div>
+                        <div className="stat-value">{totalDamage}</div>
+                      </div>
+                      <div className="stat-card">
+                        <div className="stat-label">DPS</div>
+                        <div className="stat-value">
+                          {simulationTime > 0
+                            ? (totalDamage / simulationTime).toFixed(1)
+                            : "0"}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="simulation-item-stats">
+                      <div className="panel-field">
+                        <label className="panel-label">Selected Item</label>
+                        {selectedSimulationItem ? (
+                          <div className="sim-item-name">
+                            {selectedSimulationItem.card.Localization?.Title
+                              ?.Text ??
+                              selectedSimulationItem.card.InternalName}
+                          </div>
+                        ) : (
+                          <span className="panel-empty">
+                            Click an item in deck
+                          </span>
+                        )}
+                      </div>
+                      <div className="simulation-stats simulation-stats-compact">
+                        <div className="stat-card">
+                          <div className="stat-label">Hits</div>
+                          <div className="stat-value">
+                            {selectedItemStats.hits}
+                          </div>
+                        </div>
+                        <div className="stat-card">
+                          <div className="stat-label">Damage</div>
+                          <div className="stat-value">
+                            {selectedItemStats.damage}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedItem && !isSimulating && (
               <div className="item-detail-panel">
                 <div className="panel-header">
                   <h3 className="panel-title">

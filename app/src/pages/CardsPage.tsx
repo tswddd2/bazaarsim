@@ -10,16 +10,18 @@ export default function CardsPage() {
   const [selectedCard, setSelectedCard] = useState<CardItem | null>(null);
 
   return (
-    <div className="app">
+    <div className="app cards-page">
       <header className="app-header">
         <h1>Card Database</h1>
         <p className="subtitle">Search and inspect card data</p>
         <nav className="header-nav">
-          <Link to="/" className="nav-link">Deck Builder</Link>
+          <Link to="/" className="nav-link">
+            Deck Builder
+          </Link>
         </nav>
       </header>
 
-      <main className="app-main">
+      <main className="app-main cards-main">
         {loading && <div className="loading">Loading cards...</div>}
         {error && <div className="error">Error: {error}</div>}
 
