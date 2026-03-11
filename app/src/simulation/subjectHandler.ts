@@ -1,4 +1,9 @@
 import type { DeckItem } from "../components/ItemDeck";
+import { evaluateConditions } from "./conditionHandler";
+
+export interface SubjectContext {
+  triggerSourceItem?: DeckItem;
+}
 
 /**
  * Resolve trigger subject json to a list of deck item references.
@@ -6,7 +11,8 @@ import type { DeckItem } from "../components/ItemDeck";
 export function resolveSubjectItems(
   sourceItem: DeckItem,
   subject: any,
-  items: DeckItem[]
+  items: DeckItem[],
+  context?: SubjectContext
 ): DeckItem[] {
   if (!subject || !items.length) {
     return [];
@@ -14,7 +20,11 @@ export function resolveSubjectItems(
 
   switch (subject.$type) {
     case "TTargetCardPositional":
-      return resolvePositionalTargets(sourceItem, subject, items);
+      return resolvePositionalTargets(sourceItem, subject, items, context);
+    case "TTargetCardSelf":
+      return [sourceItem];
+    case "TTargetCardTriggerSource":
+      return context?.triggerSourceItem ? [context.triggerSourceItem] : [];
     default:
       console.warn(`Unhandled subject target type: ${subject.$type}`);
       return [];
@@ -24,7 +34,8 @@ export function resolveSubjectItems(
 function resolvePositionalTargets(
   sourceItem: DeckItem,
   subject: any,
-  items: DeckItem[]
+  items: DeckItem[],
+  context?: SubjectContext
 ): DeckItem[] {
   if (subject?.Origin !== "Self") {
     console.warn(`Unhandled TTargetCardPositional origin: ${subject?.Origin}`);
@@ -86,6 +97,17 @@ function resolvePositionalTargets(
 
   if (subject?.IncludeOrigin) {
     targets = [sourceItem, ...targets];
+  }
+
+  if (subject?.Conditions != null) {
+    targets = targets.filter((targetItem) =>
+      evaluateConditions(subject.Conditions, {
+        sourceItem,
+        items,
+        triggerSourceItem: context?.triggerSourceItem,
+        currentItem: targetItem,
+      })
+    );
   }
 
   return uniqueByUid(targets);

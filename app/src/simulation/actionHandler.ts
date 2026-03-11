@@ -1,11 +1,22 @@
 import type { DeckItem } from "../components/ItemDeck";
-import { calculateReferenceValue } from "./referenceValueHandler";
+import { evaluateConditions } from "./conditionHandler";
+import { resolveSubjectItems } from "./subjectHandler";
+import { resolveNumericValue } from "./valueHandler";
+
+export interface ActionContext {
+  items?: DeckItem[];
+  firedItem?: DeckItem;
+}
 
 /**
  * Execute an action from a triggered ability
  * Returns the total damage dealt (0 if the action doesn't deal damage)
  */
-export function executeAction(item: DeckItem, action: any): number {
+export function executeAction(
+  item: DeckItem,
+  action: any,
+  context?: ActionContext
+): number {
   if (!action) {
     console.warn("No action to execute");
     return 0;
@@ -15,7 +26,10 @@ export function executeAction(item: DeckItem, action: any): number {
 
   switch (actionType) {
     case "TActionPlayerDamage":
-      return handlePlayerDamage(item, action);
+      return handlePlayerDamage(item, action, context);
+
+    case "TActionCardModifyAttribute":
+      return handleCardModifyAttribute(item, action, context);
 
     // TODO: Implement other action types:
     // case "TActionPlayerHeal":
@@ -45,11 +59,15 @@ export function executeAction(item: DeckItem, action: any): number {
  * Handle TActionPlayerDamage - deals damage to the opponent
  * For Katana, this uses the DamageAmount attribute
  */
-function handlePlayerDamage(item: DeckItem, action: any): number {
+function handlePlayerDamage(
+  item: DeckItem,
+  action: any,
+  context?: ActionContext
+): number {
   const damage =
     action?.ReferenceValue == null
       ? item.attributes.DamageAmount ?? 0
-      : calculateReferenceValue(item, action.ReferenceValue);
+      : resolveNumericValue(item, action.ReferenceValue, context);
 
   const isOpponentRelativeTarget =
     action?.Target?.$type === "TTargetPlayerRelative" &&
@@ -69,6 +87,104 @@ function handlePlayerDamage(item: DeckItem, action: any): number {
   const finalDamage = damage;
 
   return finalDamage;
+}
+
+/**
+ * Handle TActionCardModifyAttribute - modifies one or more target item attributes.
+ */
+function handleCardModifyAttribute(
+  sourceItem: DeckItem,
+  action: any,
+  context?: ActionContext
+): number {
+  const allItems = context?.items;
+  if (!allItems || allItems.length === 0) {
+    return 0;
+  }
+
+  const rawTargets = resolveSubjectItems(sourceItem, action?.Target, allItems, {
+    triggerSourceItem: context?.firedItem,
+  });
+  if (rawTargets.length === 0) {
+    return 0;
+  }
+
+  const conditionPayload = action?.Target?.Conditions;
+  const filteredTargets =
+    conditionPayload == null
+      ? rawTargets
+      : rawTargets.filter((targetItem) =>
+          evaluateConditions(conditionPayload, {
+            sourceItem,
+            items: allItems,
+            triggerSourceItem: context?.firedItem,
+            currentItem: targetItem,
+          })
+        );
+
+  const targetCount =
+    typeof action?.TargetCount === "number" ? action.TargetCount : null;
+
+  let targetsToModify = filteredTargets;
+  if (targetCount !== null && targetCount < filteredTargets.length) {
+    const shuffledTargets = [...filteredTargets];
+
+    for (let i = shuffledTargets.length - 1; i > 0; i--) {
+      const randomIndex = Math.floor(Math.random() * (i + 1));
+      [shuffledTargets[i], shuffledTargets[randomIndex]] = [
+        shuffledTargets[randomIndex],
+        shuffledTargets[i],
+      ];
+    }
+
+    targetsToModify = shuffledTargets.slice(0, targetCount);
+  }
+
+  const amount = resolveNumericValue(sourceItem, action?.Value, context);
+  const attributeType = action?.AttributeType;
+  const operation = action?.Operation ?? "Add";
+
+  if (!attributeType || targetsToModify.length === 0) {
+    return 0;
+  }
+
+  for (const targetItem of targetsToModify) {
+    const runtimeTarget = targetItem as DeckItem & {
+      initialAttributes?: Record<string, number>;
+    };
+
+    if (!runtimeTarget.initialAttributes) {
+      runtimeTarget.initialAttributes = { ...runtimeTarget.attributes };
+    }
+
+    const currentValue = runtimeTarget.attributes[attributeType] ?? 0;
+    runtimeTarget.attributes[attributeType] = applyAttributeOperation(
+      currentValue,
+      amount,
+      operation
+    );
+  }
+
+  return 0;
+}
+function applyAttributeOperation(
+  currentValue: number,
+  amount: number,
+  operation: string
+): number {
+  switch (operation) {
+    case "Add":
+      return currentValue + amount;
+    case "Subtract":
+      return currentValue - amount;
+    case "Multiply":
+      return currentValue * amount;
+    case "AdditiveMultiply":
+      return currentValue + currentValue * amount;
+    default:
+      console.warn(`Unhandled attribute operation: ${operation}`);
+      return currentValue;
+  }
 }
 
 /**

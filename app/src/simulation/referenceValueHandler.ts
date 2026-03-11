@@ -1,12 +1,13 @@
 import type { DeckItem } from "../components/ItemDeck";
+import { resolveNumericValue, type ValueContext } from "./valueHandler";
 
 /**
- * Resolves a ReferenceValue JSON payload into a numeric value.
- * TODO: implement full resolver logic for all supported ReferenceValue types.
+ * @deprecated Use valueHandler.resolveNumericValue instead.
  */
 export function calculateReferenceValue(
-  _item: DeckItem,
-  _referenceValue: unknown
+  item: DeckItem,
+  referenceValue: unknown,
+  context?: ValueContext
 ): number {
-  return 0;
+  return resolveNumericValue(item, referenceValue, context);
 }

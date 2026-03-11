@@ -95,7 +95,12 @@ export function simulateBattle(
   items: DeckItem[],
   maxTimeSeconds: number
 ): BattleResult {
-  const state = initializeCooldowns(items);
+  const simulationItems = items.map((item) => ({
+    ...item,
+    attributes: { ...item.attributes },
+  }));
+
+  const state = initializeCooldowns(simulationItems);
   const maxTimeMs = maxTimeSeconds * 1000;
   const TICK_DURATION = 100;
   const tickCount = Math.floor(maxTimeMs / TICK_DURATION);
@@ -112,7 +117,7 @@ export function simulateBattle(
   result.damageOverTime.push({ time: 0, cumulativeDamage: 0 });
 
   for (let tick = 0; tick < tickCount; tick++) {
-    const events = tickCooldowns(state, items);
+    const events = tickCooldowns(state, simulationItems);
 
     // Process each fired event
     for (const event of events) {
@@ -129,7 +134,7 @@ export function simulateBattle(
 
       // Every TTriggerOnCardFired activation also triggers TTriggerOnItemUsed listeners.
       const itemUsedResults = triggerOnItemUsedAbilities(
-        items,
+        simulationItems,
         event.itemFired
       );
       for (const itemUsedResult of itemUsedResults) {

@@ -75,7 +75,9 @@ function handleOnItemUsedTrigger(
   }
 
   const subject = ability?.Trigger?.Subject;
-  const subjectItems = resolveSubjectItems(item, subject, items);
+  const subjectItems = resolveSubjectItems(item, subject, items, {
+    triggerSourceItem: firedItem,
+  });
   const shouldTrigger = subjectItems.some(
     (subjectItem: DeckItem) => subjectItem.uid === firedItem.uid
   );
@@ -84,7 +86,10 @@ function handleOnItemUsedTrigger(
     return 0;
   }
 
-  return executeAction(item, ability.Action);
+  return executeAction(item, ability.Action, {
+    items,
+    firedItem,
+  });
 }
 
 /**
