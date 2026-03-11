@@ -1,34 +1,109 @@
 import type { DeckItem } from "../components/ItemDeck";
 import { evaluateConditions } from "./conditionHandler";
+import { getOppositePlayerSide, type PlayerSide } from "./playerState";
 
 export interface SubjectContext {
   triggerSourceItem?: DeckItem;
+  sourcePlayer?: PlayerSide;
 }
+
+export interface ResolvedSubjectTargets {
+  items: DeckItem[];
+  players: PlayerSide[];
+}
+
+const EMPTY_SUBJECT_TARGETS: ResolvedSubjectTargets = {
+  items: [],
+  players: [],
+};
 
 /**
  * Resolve trigger subject json to a list of deck item references.
  */
-export function resolveSubjectItems(
+export function resolveSubjectTargets(
   sourceItem: DeckItem,
   subject: any,
   items: DeckItem[],
   context?: SubjectContext
-): DeckItem[] {
+): ResolvedSubjectTargets {
   if (!subject || !items.length) {
-    return [];
+    return EMPTY_SUBJECT_TARGETS;
   }
+
+  const sourcePlayer = context?.sourcePlayer ?? "Self";
 
   switch (subject.$type) {
     case "TTargetCardPositional":
-      return resolvePositionalTargets(sourceItem, subject, items, context);
+      return resolveTargetCardPositionalCase(
+        sourceItem,
+        subject,
+        items,
+        context
+      );
     case "TTargetCardSelf":
-      return [sourceItem];
+      return resolveTargetCardSelfCase(sourceItem);
     case "TTargetCardTriggerSource":
-      return context?.triggerSourceItem ? [context.triggerSourceItem] : [];
+      return resolveTargetCardTriggerSourceCase(context);
+    case "TTargetPlayerRelative":
+      return resolveTargetPlayerRelativeCase(subject, sourcePlayer);
+
     default:
-      console.warn(`Unhandled subject target type: ${subject.$type}`);
-      return [];
+      console.warn(`Unhandled subject target type: ${subject?.$type}`);
+      return EMPTY_SUBJECT_TARGETS;
   }
+}
+
+function resolveTargetCardPositionalCase(
+  sourceItem: DeckItem,
+  subject: any,
+  items: DeckItem[],
+  context?: SubjectContext
+): ResolvedSubjectTargets {
+  return {
+    items: resolvePositionalTargets(sourceItem, subject, items, context),
+    players: [],
+  };
+}
+
+function resolveTargetCardSelfCase(
+  sourceItem: DeckItem
+): ResolvedSubjectTargets {
+  return {
+    items: [sourceItem],
+    players: [],
+  };
+}
+
+function resolveTargetCardTriggerSourceCase(
+  context?: SubjectContext
+): ResolvedSubjectTargets {
+  return {
+    items: context?.triggerSourceItem ? [context.triggerSourceItem] : [],
+    players: [],
+  };
+}
+
+function resolveTargetPlayerRelativeCase(
+  subject: any,
+  sourcePlayer: PlayerSide
+): ResolvedSubjectTargets {
+  const targetMode = subject?.TargetMode;
+
+  if (targetMode === "Self") {
+    return { items: [], players: [sourcePlayer] };
+  }
+
+  if (targetMode === "Opponent") {
+    return {
+      items: [],
+      players: [getOppositePlayerSide(sourcePlayer)],
+    };
+  }
+
+  console.warn(
+    `Unhandled TTargetPlayerRelative target mode: ${subject?.TargetMode}`
+  );
+  return EMPTY_SUBJECT_TARGETS;
 }
 
 function resolvePositionalTargets(
@@ -70,23 +145,23 @@ function resolvePositionalTargets(
 
   switch (subject?.TargetMode) {
     case "Neighbor":
-      targets = [touchingLeft, touchingRight].filter(Boolean) as DeckItem[];
+      targets = resolveNeighborTargetModeCase(touchingLeft, touchingRight);
       break;
 
     case "LeftCard":
-      targets = leftItems.length > 0 ? [leftItems[0]] : [];
+      targets = resolveLeftCardTargetModeCase(leftItems);
       break;
 
     case "RightCard":
-      targets = rightItems.length > 0 ? [rightItems[0]] : [];
+      targets = resolveRightCardTargetModeCase(rightItems);
       break;
 
     case "AllLeftCards":
-      targets = leftItems;
+      targets = resolveAllLeftCardsTargetModeCase(leftItems);
       break;
 
     case "AllRightCards":
-      targets = rightItems;
+      targets = resolveAllRightCardsTargetModeCase(rightItems);
       break;
 
     default:
@@ -111,6 +186,31 @@ function resolvePositionalTargets(
   }
 
   return uniqueByUid(targets);
+}
+
+function resolveNeighborTargetModeCase(
+  touchingLeft: DeckItem | undefined,
+  touchingRight: DeckItem | undefined
+): DeckItem[] {
+  return [touchingLeft, touchingRight].filter(Boolean) as DeckItem[];
+}
+
+function resolveLeftCardTargetModeCase(leftItems: DeckItem[]): DeckItem[] {
+  return leftItems.length > 0 ? [leftItems[0]] : [];
+}
+
+function resolveRightCardTargetModeCase(rightItems: DeckItem[]): DeckItem[] {
+  return rightItems.length > 0 ? [rightItems[0]] : [];
+}
+
+function resolveAllLeftCardsTargetModeCase(leftItems: DeckItem[]): DeckItem[] {
+  return leftItems;
+}
+
+function resolveAllRightCardsTargetModeCase(
+  rightItems: DeckItem[]
+): DeckItem[] {
+  return rightItems;
 }
 
 function uniqueByUid(items: DeckItem[]): DeckItem[] {

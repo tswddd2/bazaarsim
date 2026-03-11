@@ -1,11 +1,18 @@
 import type { DeckItem } from "../components/ItemDeck";
 import { evaluateConditions } from "./conditionHandler";
-import { resolveSubjectItems } from "./subjectHandler";
+import { resolveSubjectTargets } from "./subjectHandler";
 import { resolveNumericValue } from "./valueHandler";
+import {
+  getPlayerStatusBySide,
+  type PlayerSide,
+  type PlayerState,
+} from "./playerState";
 
 export interface ActionContext {
   items?: DeckItem[];
   firedItem?: DeckItem;
+  players?: PlayerState;
+  sourcePlayer?: PlayerSide;
 }
 
 /**
@@ -31,6 +38,9 @@ export function executeAction(
     case "TActionCardModifyAttribute":
       return handleCardModifyAttribute(item, action, context);
 
+    case "TActionPlayerBurnApply":
+      return handlePlayerBurnApply(item, action, context);
+
     // TODO: Implement other action types:
     // case "TActionPlayerHeal":
     //   return handlePlayerHeal(item, action);
@@ -53,6 +63,45 @@ export function executeAction(
       console.warn(`Unhandled action type: ${actionType}`);
       return 0;
   }
+}
+
+function handlePlayerBurnApply(
+  item: DeckItem,
+  action: any,
+  context?: ActionContext
+): number {
+  const playerState = context?.players;
+  if (!playerState) {
+    return 0;
+  }
+
+  const targets = resolveSubjectTargets(
+    item,
+    action?.Target,
+    context?.items ?? [item],
+    {
+      sourcePlayer: context?.sourcePlayer ?? "Self",
+    }
+  ).players;
+  if (targets.length === 0) {
+    return 0;
+  }
+
+  const burnAmount =
+    action?.ReferenceValue == null
+      ? item.attributes.BurnApplyAmount ?? 0
+      : resolveNumericValue(item, action.ReferenceValue, context);
+
+  if (burnAmount <= 0) {
+    return 0;
+  }
+
+  for (const targetSide of targets) {
+    const targetStatus = getPlayerStatusBySide(playerState, targetSide);
+    targetStatus.Burn += burnAmount;
+  }
+
+  return 0;
 }
 
 /**
@@ -102,9 +151,15 @@ function handleCardModifyAttribute(
     return 0;
   }
 
-  const rawTargets = resolveSubjectItems(sourceItem, action?.Target, allItems, {
-    triggerSourceItem: context?.firedItem,
-  });
+  const rawTargets = resolveSubjectTargets(
+    sourceItem,
+    action?.Target,
+    allItems,
+    {
+      triggerSourceItem: context?.firedItem,
+      sourcePlayer: context?.sourcePlayer,
+    }
+  ).items;
   if (rawTargets.length === 0) {
     return 0;
   }

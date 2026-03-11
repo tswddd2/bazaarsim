@@ -1,5 +1,5 @@
 import type { DeckItem } from "../components/ItemDeck";
-import { resolveSubjectItems } from "./subjectHandler";
+import { resolveSubjectTargets } from "./subjectHandler";
 
 export interface ValueContext {
   items?: DeckItem[];
@@ -19,14 +19,14 @@ export function resolveNumericValue(
 
   if (valuePayload?.$type === "TReferenceValueCardAttribute") {
     const allItems = context?.items ?? [sourceItem];
-    const targets = resolveSubjectItems(
+    const targets = resolveSubjectTargets(
       sourceItem,
       valuePayload?.Target,
       allItems,
       {
         triggerSourceItem: context?.firedItem,
       }
-    );
+    ).items;
     const valueSource = targets[0] ?? sourceItem;
     const attr = valuePayload?.AttributeType;
     const defaultValue =

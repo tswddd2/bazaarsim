@@ -1,10 +1,13 @@
 import type { DeckItem } from "../components/ItemDeck";
 import { executeAction } from "./actionHandler.ts";
-import { resolveSubjectItems } from "./subjectHandler";
+import { resolveSubjectTargets } from "./subjectHandler";
+import type { PlayerSide, PlayerState } from "./playerState";
 
 export interface TriggerContext {
   items?: DeckItem[];
   firedItem?: DeckItem;
+  players?: PlayerState;
+  sourcePlayer?: PlayerSide;
 }
 
 /**
@@ -30,7 +33,7 @@ export function triggerAbility(
   // Handle different trigger types
   switch (triggerType) {
     case "TTriggerOnCardFired":
-      return handleOnCardFiredTrigger(item, ability);
+      return handleOnCardFiredTrigger(item, ability, context);
 
     case "TTriggerOnItemUsed":
       return handleOnItemUsedTrigger(item, ability, context);
@@ -53,9 +56,13 @@ export function triggerAbility(
  * Handle TTriggerOnCardFired - this trigger activates when the item's cooldown completes
  * It simply executes the associated action immediately
  */
-function handleOnCardFiredTrigger(item: DeckItem, ability: any): number {
+function handleOnCardFiredTrigger(
+  item: DeckItem,
+  ability: any,
+  context?: TriggerContext
+): number {
   // TTriggerOnCardFired has no additional conditions - just execute the action
-  return executeAction(item, ability.Action);
+  return executeAction(item, ability.Action, context);
 }
 
 /**
@@ -75,9 +82,10 @@ function handleOnItemUsedTrigger(
   }
 
   const subject = ability?.Trigger?.Subject;
-  const subjectItems = resolveSubjectItems(item, subject, items, {
+  const subjectItems = resolveSubjectTargets(item, subject, items, {
     triggerSourceItem: firedItem,
-  });
+    sourcePlayer: context?.sourcePlayer,
+  }).items;
   const shouldTrigger = subjectItems.some(
     (subjectItem: DeckItem) => subjectItem.uid === firedItem.uid
   );
@@ -89,6 +97,8 @@ function handleOnItemUsedTrigger(
   return executeAction(item, ability.Action, {
     items,
     firedItem,
+    players: context?.players,
+    sourcePlayer: context?.sourcePlayer,
   });
 }
 
@@ -97,7 +107,8 @@ function handleOnItemUsedTrigger(
  */
 export function triggerOnItemUsedAbilities(
   items: DeckItem[],
-  firedItem: DeckItem
+  firedItem: DeckItem,
+  context?: Omit<TriggerContext, "items" | "firedItem">
 ): Array<{ item: DeckItem; abilityId: string; damage: number }> {
   const results: Array<{ item: DeckItem; abilityId: string; damage: number }> =
     [];
@@ -116,6 +127,8 @@ export function triggerOnItemUsedAbilities(
       const damage = triggerAbility(item, abilityId, {
         items,
         firedItem,
+        players: context?.players,
+        sourcePlayer: context?.sourcePlayer,
       });
 
       if (damage > 0) {

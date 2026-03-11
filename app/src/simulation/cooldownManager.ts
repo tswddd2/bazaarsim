@@ -3,6 +3,9 @@ import {
   triggerAbility,
   triggerOnItemUsedAbilities,
 } from "./triggerHandler.ts";
+import { createInitialPlayerState, type PlayerState } from "./playerState";
+
+export const SIMULATION_TICK_DURATION_MS = 100;
 
 export interface CooldownState {
   uid: string;
@@ -13,6 +16,8 @@ export interface CooldownState {
 export interface SimulationState {
   cooldowns: Map<string, CooldownState>;
   timeElapsed: number; // in milliseconds
+  players: PlayerState;
+  burnTickAccumulator: number;
 }
 
 /**
@@ -36,6 +41,8 @@ export function initializeCooldowns(items: DeckItem[]): SimulationState {
   return {
     cooldowns,
     timeElapsed: 0,
+    players: createInitialPlayerState(),
+    burnTickAccumulator: 0,
   };
 }
 
@@ -47,7 +54,6 @@ export function tickCooldowns(
   state: SimulationState,
   items: DeckItem[]
 ): { itemFired: DeckItem; abilityId: string }[] {
-  const TICK_DURATION = 100; // milliseconds
   const firedEvents: { itemFired: DeckItem; abilityId: string }[] = [];
 
   // Create a map for quick item lookup
@@ -59,7 +65,7 @@ export function tickCooldowns(
     if (!item) return;
 
     // Decrease cooldown
-    cooldownState.currentCooldown -= TICK_DURATION;
+    cooldownState.currentCooldown -= SIMULATION_TICK_DURATION_MS;
 
     // Check if cooldown reached 0 or below
     if (cooldownState.currentCooldown <= 0) {
@@ -83,7 +89,7 @@ export function tickCooldowns(
   });
 
   // Increment time
-  state.timeElapsed += TICK_DURATION;
+  state.timeElapsed += SIMULATION_TICK_DURATION_MS;
 
   return firedEvents;
 }
@@ -102,8 +108,7 @@ export function simulateBattle(
 
   const state = initializeCooldowns(simulationItems);
   const maxTimeMs = maxTimeSeconds * 1000;
-  const TICK_DURATION = 100;
-  const tickCount = Math.floor(maxTimeMs / TICK_DURATION);
+  const tickCount = Math.floor(maxTimeMs / SIMULATION_TICK_DURATION_MS);
 
   const result: BattleResult = {
     totalDamage: 0,
@@ -111,6 +116,7 @@ export function simulateBattle(
     criticalHits: 0,
     damageOverTime: [], // Array of { time, damage } for each tick
     cardEvents: [],
+    playerState: state.players,
   };
 
   // Initialize damage over time with 0 damage at time 0
@@ -121,7 +127,12 @@ export function simulateBattle(
 
     // Process each fired event
     for (const event of events) {
-      const damage = triggerAbility(event.itemFired, event.abilityId);
+      const damage = triggerAbility(event.itemFired, event.abilityId, {
+        items: simulationItems,
+        firedItem: event.itemFired,
+        players: state.players,
+        sourcePlayer: "Self",
+      });
       result.totalDamage += damage;
       if (damage > 0) {
         result.totalHits += 1;
@@ -135,7 +146,11 @@ export function simulateBattle(
       // Every TTriggerOnCardFired activation also triggers TTriggerOnItemUsed listeners.
       const itemUsedResults = triggerOnItemUsedAbilities(
         simulationItems,
-        event.itemFired
+        event.itemFired,
+        {
+          players: state.players,
+          sourcePlayer: "Self",
+        }
       );
       for (const itemUsedResult of itemUsedResults) {
         result.totalDamage += itemUsedResult.damage;
@@ -147,6 +162,8 @@ export function simulateBattle(
         });
       }
     }
+
+    applyBurnTickDamage(state, result);
 
     // Record cumulative damage at this time
     const currentTime = (state.timeElapsed / 1000).toFixed(1);
@@ -165,10 +182,33 @@ export interface BattleResult {
   criticalHits: number;
   damageOverTime: Array<{ time: number; cumulativeDamage: number }>;
   cardEvents: BattleCardEvent[];
+  playerState: PlayerState;
 }
 
 export interface BattleCardEvent {
   time: number;
   uid: string;
   damage: number;
+}
+
+function applyBurnTickDamage(
+  state: SimulationState,
+  result: BattleResult
+): void {
+  const BURN_TICK_MS = 500;
+  state.burnTickAccumulator += SIMULATION_TICK_DURATION_MS;
+
+  while (state.burnTickAccumulator >= BURN_TICK_MS) {
+    state.burnTickAccumulator -= BURN_TICK_MS;
+
+    const opponentBurn = state.players.opponent.Burn;
+    if (opponentBurn <= 0) {
+      continue;
+    }
+
+    result.totalDamage += opponentBurn;
+
+    const decay = Math.max(1, Math.round(opponentBurn * 0.05));
+    state.players.opponent.Burn = Math.max(0, opponentBurn - decay);
+  }
 }

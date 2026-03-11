@@ -1,5 +1,5 @@
 import type { DeckItem } from "../components/ItemDeck";
-import { resolveSubjectItems } from "./subjectHandler";
+import { resolveSubjectTargets } from "./subjectHandler";
 
 export interface ConditionContext {
   sourceItem: DeckItem;
@@ -59,9 +59,14 @@ function evaluateTagCondition(
   const operator = condition?.Operator ?? "Any";
 
   const targetItems: DeckItem[] = condition?.Target
-    ? resolveSubjectItems(context.sourceItem, condition.Target, context.items, {
-        triggerSourceItem: context.triggerSourceItem,
-      })
+    ? resolveSubjectTargets(
+        context.sourceItem,
+        condition.Target,
+        context.items,
+        {
+          triggerSourceItem: context.triggerSourceItem,
+        }
+      ).items
     : [context.currentItem ?? context.sourceItem];
 
   if (targetItems.length === 0) {
