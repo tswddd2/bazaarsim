@@ -318,6 +318,25 @@
   letter-spacing: 0.08em;
 }
 
+.card-json-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.json-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #c0c7cb;
+  font-size: 0.9rem;
+  user-select: none;
+}
+
+.json-toggle input {
+  accent-color: #c47a32;
+}
+
 .copy-btn {
   display: flex;
   align-items: center;
