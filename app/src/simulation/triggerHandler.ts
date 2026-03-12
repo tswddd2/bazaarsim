@@ -8,24 +8,28 @@ export interface TriggerContext {
   firedItem?: DeckItem;
   players?: PlayerState;
   sourcePlayer?: PlayerSide;
+  result?: {
+    totalDamage: number;
+    cardEvents: Array<{ time: number; uid: string; damage: number }>;
+  };
+  eventTimeSeconds?: number;
 }
 
 /**
  * Trigger an ability based on its trigger type
- * Returns the total damage dealt (if any)
  */
 export function triggerAbility(
   item: DeckItem,
   abilityId: string,
   context?: TriggerContext
-): number {
+): void {
   const ability = (item.card.Abilities as any)?.[abilityId];
 
   if (!ability) {
     console.warn(
       `Ability ${abilityId} not found on item ${item.card.InternalName}`
     );
-    return 0;
+    return;
   }
 
   const triggerType = ability.Trigger?.$type;
@@ -33,10 +37,12 @@ export function triggerAbility(
   // Handle different trigger types
   switch (triggerType) {
     case "TTriggerOnCardFired":
-      return handleOnCardFiredTrigger(item, ability, context);
+      handleOnCardFiredTrigger(item, ability, context);
+      return;
 
     case "TTriggerOnItemUsed":
-      return handleOnItemUsedTrigger(item, ability, context);
+      handleOnItemUsedTrigger(item, ability, context);
+      return;
 
     // TODO: Add other trigger types as needed:
     // case "TTriggerOnHit":
@@ -48,7 +54,7 @@ export function triggerAbility(
 
     default:
       console.warn(`Unhandled trigger type: ${triggerType}`);
-      return 0;
+      return;
   }
 }
 
@@ -60,9 +66,9 @@ function handleOnCardFiredTrigger(
   item: DeckItem,
   ability: any,
   context?: TriggerContext
-): number {
+): void {
   // TTriggerOnCardFired has no additional conditions - just execute the action
-  return executeAction(item, ability.Action, context);
+  executeAction(item, ability.Action, context);
 }
 
 /**
@@ -73,12 +79,12 @@ function handleOnItemUsedTrigger(
   item: DeckItem,
   ability: any,
   context?: TriggerContext
-): number {
+): void {
   const firedItem = context?.firedItem;
   const items = context?.items;
 
   if (!firedItem || !items) {
-    return 0;
+    return;
   }
 
   const subject = ability?.Trigger?.Subject;
@@ -91,14 +97,16 @@ function handleOnItemUsedTrigger(
   );
 
   if (!shouldTrigger) {
-    return 0;
+    return;
   }
 
-  return executeAction(item, ability.Action, {
+  executeAction(item, ability.Action, {
     items,
     firedItem,
     players: context?.players,
     sourcePlayer: context?.sourcePlayer,
+    result: context?.result,
+    eventTimeSeconds: context?.eventTimeSeconds,
   });
 }
 
@@ -109,10 +117,7 @@ export function triggerOnItemUsedAbilities(
   items: DeckItem[],
   firedItem: DeckItem,
   context?: Omit<TriggerContext, "items" | "firedItem">
-): Array<{ item: DeckItem; abilityId: string; damage: number }> {
-  const results: Array<{ item: DeckItem; abilityId: string; damage: number }> =
-    [];
-
+): void {
   for (const item of items) {
     if (!item.abilityIds || item.abilityIds.length === 0) {
       continue;
@@ -124,20 +129,16 @@ export function triggerOnItemUsedAbilities(
         continue;
       }
 
-      const damage = triggerAbility(item, abilityId, {
+      triggerAbility(item, abilityId, {
         items,
         firedItem,
         players: context?.players,
         sourcePlayer: context?.sourcePlayer,
+        result: context?.result,
+        eventTimeSeconds: context?.eventTimeSeconds,
       });
-
-      if (damage > 0) {
-        results.push({ item, abilityId, damage });
-      }
     }
   }
-
-  return results;
 }
 
 /**

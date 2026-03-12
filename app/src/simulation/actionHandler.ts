@@ -13,33 +13,40 @@ export interface ActionContext {
   firedItem?: DeckItem;
   players?: PlayerState;
   sourcePlayer?: PlayerSide;
+  result?: {
+    totalDamage: number;
+    cardEvents: Array<{ time: number; uid: string; damage: number }>;
+  };
+  eventTimeSeconds?: number;
 }
 
 /**
  * Execute an action from a triggered ability
- * Returns the total damage dealt (0 if the action doesn't deal damage)
  */
 export function executeAction(
   item: DeckItem,
   action: any,
   context?: ActionContext
-): number {
+): void {
   if (!action) {
     console.warn("No action to execute");
-    return 0;
+    return;
   }
 
   const actionType = action.$type;
 
   switch (actionType) {
     case "TActionPlayerDamage":
-      return handlePlayerDamage(item, action, context);
+      handlePlayerDamage(item, action, context);
+      return;
 
     case "TActionCardModifyAttribute":
-      return handleCardModifyAttribute(item, action, context);
+      handleCardModifyAttribute(item, action, context);
+      return;
 
     case "TActionPlayerBurnApply":
-      return handlePlayerBurnApply(item, action, context);
+      handlePlayerBurnApply(item, action, context);
+      return;
 
     // TODO: Implement other action types:
     // case "TActionPlayerHeal":
@@ -61,7 +68,7 @@ export function executeAction(
 
     default:
       console.warn(`Unhandled action type: ${actionType}`);
-      return 0;
+      return;
   }
 }
 
@@ -69,10 +76,10 @@ function handlePlayerBurnApply(
   item: DeckItem,
   action: any,
   context?: ActionContext
-): number {
+): void {
   const playerState = context?.players;
   if (!playerState) {
-    return 0;
+    return;
   }
 
   const targets = resolveSubjectTargets(
@@ -84,7 +91,7 @@ function handlePlayerBurnApply(
     }
   ).players;
   if (targets.length === 0) {
-    return 0;
+    return;
   }
 
   const burnAmount =
@@ -93,7 +100,7 @@ function handlePlayerBurnApply(
       : resolveNumericValue(item, action.ReferenceValue, context);
 
   if (burnAmount <= 0) {
-    return 0;
+    return;
   }
 
   for (const targetSide of targets) {
@@ -101,7 +108,7 @@ function handlePlayerBurnApply(
     targetStatus.Burn += burnAmount;
   }
 
-  return 0;
+  return;
 }
 
 /**
@@ -112,7 +119,7 @@ function handlePlayerDamage(
   item: DeckItem,
   action: any,
   context?: ActionContext
-): number {
+): void {
   const damage =
     action?.ReferenceValue == null
       ? item.attributes.DamageAmount ?? 0
@@ -125,7 +132,7 @@ function handlePlayerDamage(
 
   if (!isOpponentRelativeTarget) {
     console.log("Unhandled TActionPlayerDamage target:", action?.Target);
-    return 0;
+    return;
   }
 
   // TODO: Apply damage modifiers:
@@ -135,7 +142,18 @@ function handlePlayerDamage(
 
   const finalDamage = damage;
 
-  return finalDamage;
+  if (finalDamage > 0) {
+    if (context?.result) {
+      context.result.totalDamage += finalDamage;
+      context.result.cardEvents.push({
+        time: context.eventTimeSeconds ?? 0,
+        uid: item.uid,
+        damage: finalDamage,
+      });
+    }
+  }
+
+  return;
 }
 
 /**
@@ -145,10 +163,10 @@ function handleCardModifyAttribute(
   sourceItem: DeckItem,
   action: any,
   context?: ActionContext
-): number {
+): void {
   const allItems = context?.items;
   if (!allItems || allItems.length === 0) {
-    return 0;
+    return;
   }
 
   const rawTargets = resolveSubjectTargets(
@@ -161,7 +179,7 @@ function handleCardModifyAttribute(
     }
   ).items;
   if (rawTargets.length === 0) {
-    return 0;
+    return;
   }
 
   const conditionPayload = action?.Target?.Conditions;
@@ -200,7 +218,7 @@ function handleCardModifyAttribute(
   const operation = action?.Operation ?? "Add";
 
   if (!attributeType || targetsToModify.length === 0) {
-    return 0;
+    return;
   }
 
   for (const targetItem of targetsToModify) {
@@ -220,7 +238,7 @@ function handleCardModifyAttribute(
     );
   }
 
-  return 0;
+  return;
 }
 function applyAttributeOperation(
   currentValue: number,
@@ -246,70 +264,70 @@ function applyAttributeOperation(
  * Handle TActionPlayerHeal - heals the player
  */
 // @ts-ignore - TODO: Implement healing logic
-function handlePlayerHeal(item: DeckItem, action: any): number {
+function handlePlayerHeal(item: DeckItem, action: any): void {
   // TODO: Implement healing logic
-  return 0;
+  return;
 }
 
 /**
  * Handle TActionModifyItemAttribute - modifies an item's attribute
  */
 // @ts-ignore - TODO: Implement attribute modification logic
-function handleModifyItemAttribute(item: DeckItem, action: any): number {
+function handleModifyItemAttribute(item: DeckItem, action: any): void {
   // TODO: Implement attribute modification logic
-  return 0;
+  return;
 }
 
 /**
  * Handle TActionBurn - applies burn effect
  */
 // @ts-ignore - TODO: Implement burn logic
-function handleBurn(item: DeckItem, action: any): number {
+function handleBurn(item: DeckItem, action: any): void {
   // TODO: Implement burn logic
-  return 0;
+  return;
 }
 
 /**
  * Handle TActionFreeze - applies freeze effect
  */
 // @ts-ignore - TODO: Implement freeze logic
-function handleFreeze(item: DeckItem, action: any): number {
+function handleFreeze(item: DeckItem, action: any): void {
   // TODO: Implement freeze logic
-  return 0;
+  return;
 }
 
 /**
  * Handle TActionPoison - applies poison effect
  */
 // @ts-ignore - TODO: Implement poison logic
-function handlePoison(item: DeckItem, action: any): number {
+function handlePoison(item: DeckItem, action: any): void {
   // TODO: Implement poison logic
-  return 0;
+  return;
 }
 
 /**
  * Handle TActionSlow - applies slow effect
  */
 // @ts-ignore - TODO: Implement slow logic
-function handleSlow(item: DeckItem, action: any): number {
+function handleSlow(item: DeckItem, action: any): void {
   // TODO: Implement slow logic
-  return 0;
+  return;
 }
 
 /**
  * Handle TActionHaste - applies haste effect
  */
 // @ts-ignore - TODO: Implement haste logic
-function handleHaste(item: DeckItem, action: any): number {
+function handleHaste(item: DeckItem, action: any): void {
   // TODO: Implement haste logic
-  return 0;
+  return;
 }
 
 /**
  * Handle TActionShield - applies shield effect
  */
 // @ts-ignore - TODO: Implement shield logic
-function handleShield(item: DeckItem, action: any): number {
+function handleShield(item: DeckItem, action: any): void {
   // TODO: Implement shield logic
-  return 0;
+  return;
 }

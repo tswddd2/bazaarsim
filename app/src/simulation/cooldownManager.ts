@@ -17,13 +17,12 @@ export interface SimulationState {
   cooldowns: Map<string, CooldownState>;
   timeElapsed: number; // in milliseconds
   players: PlayerState;
-  burnTickAccumulator: number;
 }
 
 /**
  * Initialize cooldown states for all items in the deck
  */
-export function initializeCooldowns(items: DeckItem[]): SimulationState {
+export function initializeState(items: DeckItem[]): SimulationState {
   const cooldowns = new Map<string, CooldownState>();
 
   for (const item of items) {
@@ -42,7 +41,6 @@ export function initializeCooldowns(items: DeckItem[]): SimulationState {
     cooldowns,
     timeElapsed: 0,
     players: createInitialPlayerState(),
-    burnTickAccumulator: 0,
   };
 }
 
@@ -69,7 +67,6 @@ export function tickCooldowns(
 
     // Check if cooldown reached 0 or below
     if (cooldownState.currentCooldown <= 0) {
-      // Item fires!
       // Get abilities with TTriggerOnCardFired
       if (item.abilityIds && item.abilityIds.length > 0) {
         for (const abilityId of item.abilityIds) {
@@ -106,61 +103,44 @@ export function simulateBattle(
     attributes: { ...item.attributes },
   }));
 
-  const state = initializeCooldowns(simulationItems);
+  const state = initializeState(simulationItems);
   const maxTimeMs = maxTimeSeconds * 1000;
   const tickCount = Math.floor(maxTimeMs / SIMULATION_TICK_DURATION_MS);
 
   const result: BattleResult = {
     totalDamage: 0,
-    totalHits: 0,
-    criticalHits: 0,
     damageOverTime: [], // Array of { time, damage } for each tick
+    burnOverTime: [],
     cardEvents: [],
     playerState: state.players,
   };
 
   // Initialize damage over time with 0 damage at time 0
   result.damageOverTime.push({ time: 0, cumulativeDamage: 0 });
+  result.burnOverTime.push({ time: 0, burn: state.players.opponent.Burn });
 
   for (let tick = 0; tick < tickCount; tick++) {
     const events = tickCooldowns(state, simulationItems);
 
     // Process each fired event
     for (const event of events) {
-      const damage = triggerAbility(event.itemFired, event.abilityId, {
+      triggerAbility(event.itemFired, event.abilityId, {
         items: simulationItems,
         firedItem: event.itemFired,
         players: state.players,
         sourcePlayer: "Self",
+        result,
+        eventTimeSeconds: state.timeElapsed / 1000,
       });
-      result.totalDamage += damage;
-      if (damage > 0) {
-        result.totalHits += 1;
-        result.cardEvents.push({
-          time: state.timeElapsed / 1000,
-          uid: event.itemFired.uid,
-          damage,
-        });
-      }
 
-      // Every TTriggerOnCardFired activation also triggers TTriggerOnItemUsed listeners.
-      const itemUsedResults = triggerOnItemUsedAbilities(
-        simulationItems,
-        event.itemFired,
-        {
-          players: state.players,
-          sourcePlayer: "Self",
-        }
-      );
-      for (const itemUsedResult of itemUsedResults) {
-        result.totalDamage += itemUsedResult.damage;
-        result.totalHits += 1;
-        result.cardEvents.push({
-          time: state.timeElapsed / 1000,
-          uid: itemUsedResult.item.uid,
-          damage: itemUsedResult.damage,
-        });
-      }
+      // TODO: Should have a more robust event system to handle ability triggers and effects.
+      // TODO: TTriggerOnCardFired is triggered per fired item, not per fired ability
+      triggerOnItemUsedAbilities(simulationItems, event.itemFired, {
+        players: state.players,
+        sourcePlayer: "Self",
+        result,
+        eventTimeSeconds: state.timeElapsed / 1000,
+      });
     }
 
     applyBurnTickDamage(state, result);
@@ -171,6 +151,10 @@ export function simulateBattle(
       time: parseFloat(currentTime),
       cumulativeDamage: result.totalDamage,
     });
+    result.burnOverTime.push({
+      time: parseFloat(currentTime),
+      burn: state.players.opponent.Burn,
+    });
   }
 
   return result;
@@ -178,9 +162,8 @@ export function simulateBattle(
 
 export interface BattleResult {
   totalDamage: number;
-  totalHits: number;
-  criticalHits: number;
   damageOverTime: Array<{ time: number; cumulativeDamage: number }>;
+  burnOverTime: Array<{ time: number; burn: number }>;
   cardEvents: BattleCardEvent[];
   playerState: PlayerState;
 }
@@ -196,19 +179,17 @@ function applyBurnTickDamage(
   result: BattleResult
 ): void {
   const BURN_TICK_MS = 500;
-  state.burnTickAccumulator += SIMULATION_TICK_DURATION_MS;
-
-  while (state.burnTickAccumulator >= BURN_TICK_MS) {
-    state.burnTickAccumulator -= BURN_TICK_MS;
-
-    const opponentBurn = state.players.opponent.Burn;
-    if (opponentBurn <= 0) {
-      continue;
-    }
-
-    result.totalDamage += opponentBurn;
-
-    const decay = Math.max(1, Math.round(opponentBurn * 0.05));
-    state.players.opponent.Burn = Math.max(0, opponentBurn - decay);
+  if (state.timeElapsed % BURN_TICK_MS !== 0) {
+    return;
   }
+
+  const opponentBurn = state.players.opponent.Burn;
+  if (opponentBurn <= 0) {
+    return;
+  }
+
+  result.totalDamage += opponentBurn;
+
+  const decay = Math.max(1, Math.round(opponentBurn * 0.05));
+  state.players.opponent.Burn = Math.max(0, opponentBurn - decay);
 }
