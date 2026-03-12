@@ -1,9 +1,6 @@
 import type { DeckItem } from "../components/ItemDeck";
-import {
-  triggerAbility,
-  triggerOnItemUsedAbilities,
-} from "./triggerHandler.ts";
 import { createInitialPlayerState, type PlayerState } from "./playerState";
+import { SimulationQueue } from "./eventSystem";
 
 export const SIMULATION_TICK_DURATION_MS = 100;
 
@@ -17,6 +14,7 @@ export interface SimulationState {
   cooldowns: Map<string, CooldownState>;
   timeElapsed: number; // in milliseconds
   players: PlayerState;
+  queue: SimulationQueue;
 }
 
 /**
@@ -37,23 +35,20 @@ export function initializeState(items: DeckItem[]): SimulationState {
     }
   }
 
+  const queue = new SimulationQueue();
+
   return {
     cooldowns,
     timeElapsed: 0,
     players: createInitialPlayerState(),
+    queue,
   };
 }
 
 /**
  * Process a single simulation tick (0.1 seconds = 100ms)
- * Returns an array of events that occurred during this tick
  */
-export function tickCooldowns(
-  state: SimulationState,
-  items: DeckItem[]
-): { itemFired: DeckItem; abilityId: string }[] {
-  const firedEvents: { itemFired: DeckItem; abilityId: string }[] = [];
-
+export function tickCooldowns(state: SimulationState, items: DeckItem[]): void {
   // Create a map for quick item lookup
   const itemMap = new Map(items.map((item) => [item.uid, item]));
 
@@ -67,18 +62,15 @@ export function tickCooldowns(
 
     // Check if cooldown reached 0 or below
     if (cooldownState.currentCooldown <= 0) {
-      // Get abilities with TTriggerOnCardFired
-      if (item.abilityIds && item.abilityIds.length > 0) {
-        for (const abilityId of item.abilityIds) {
-          const ability = (item.card.Abilities as any)?.[abilityId];
-          if (ability && ability.Trigger?.$type === "TTriggerOnCardFired") {
-            firedEvents.push({
-              itemFired: item,
-              abilityId: abilityId,
-            });
-          }
-        }
-      }
+      // Emit signals for the fired item
+      state.queue.emitSignal({
+        signalName: `TTriggerOnCardFired-${item.uid}`,
+        sourceItem: item,
+      });
+      state.queue.emitSignal({
+        signalName: "TTriggerOnItemUsed",
+        sourceItem: item,
+      });
 
       // Reset cooldown
       cooldownState.currentCooldown = cooldownState.maxCooldown;
@@ -87,8 +79,6 @@ export function tickCooldowns(
 
   // Increment time
   state.timeElapsed += SIMULATION_TICK_DURATION_MS;
-
-  return firedEvents;
 }
 
 /**
@@ -119,29 +109,18 @@ export function simulateBattle(
   result.damageOverTime.push({ time: 0, cumulativeDamage: 0 });
   result.burnOverTime.push({ time: 0, burn: state.players.opponent.Burn });
 
+  // Register all triggers from all items before starting battle
+  state.queue.registerTriggers(simulationItems, {
+    items: simulationItems,
+    players: state.players,
+    sourcePlayer: "Self",
+    result,
+  });
+
   for (let tick = 0; tick < tickCount; tick++) {
-    const events = tickCooldowns(state, simulationItems);
+    tickCooldowns(state, simulationItems);
 
-    // Process each fired event
-    for (const event of events) {
-      triggerAbility(event.itemFired, event.abilityId, {
-        items: simulationItems,
-        firedItem: event.itemFired,
-        players: state.players,
-        sourcePlayer: "Self",
-        result,
-        eventTimeSeconds: state.timeElapsed / 1000,
-      });
-
-      // TODO: Should have a more robust event system to handle ability triggers and effects.
-      // TODO: TTriggerOnCardFired is triggered per fired item, not per fired ability
-      triggerOnItemUsedAbilities(simulationItems, event.itemFired, {
-        players: state.players,
-        sourcePlayer: "Self",
-        result,
-        eventTimeSeconds: state.timeElapsed / 1000,
-      });
-    }
+    state.queue.processQueues(state.timeElapsed / 1000);
 
     applyBurnTickDamage(state, result);
 

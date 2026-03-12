@@ -8,9 +8,11 @@ import {
   type PlayerState,
 } from "./playerState";
 
+import type { SimulationQueue } from "./eventSystem";
+
 export interface ActionContext {
   items?: DeckItem[];
-  firedItem?: DeckItem;
+  sourceItem?: DeckItem;
   players?: PlayerState;
   sourcePlayer?: PlayerSide;
   result?: {
@@ -26,7 +28,8 @@ export interface ActionContext {
 export function executeAction(
   item: DeckItem,
   action: any,
-  context?: ActionContext
+  context?: ActionContext,
+  queue?: SimulationQueue
 ): void {
   if (!action) {
     console.warn("No action to execute");
@@ -45,7 +48,7 @@ export function executeAction(
       return;
 
     case "TActionPlayerBurnApply":
-      handlePlayerBurnApply(item, action, context);
+      handlePlayerBurnApply(item, action, context, queue);
       return;
 
     // TODO: Implement other action types:
@@ -75,7 +78,8 @@ export function executeAction(
 function handlePlayerBurnApply(
   item: DeckItem,
   action: any,
-  context?: ActionContext
+  context?: ActionContext,
+  queue?: SimulationQueue
 ): void {
   const playerState = context?.players;
   if (!playerState) {
@@ -106,6 +110,13 @@ function handlePlayerBurnApply(
   for (const targetSide of targets) {
     const targetStatus = getPlayerStatusBySide(playerState, targetSide);
     targetStatus.Burn += burnAmount;
+  }
+
+  if (queue) {
+    queue.emitSignal({
+      signalName: "TTriggerOnCardPerformedBurn",
+      sourceItem: item,
+    });
   }
 
   return;
@@ -174,7 +185,7 @@ function handleCardModifyAttribute(
     action?.Target,
     allItems,
     {
-      triggerSourceItem: context?.firedItem,
+      triggerSourceItem: context?.sourceItem,
       sourcePlayer: context?.sourcePlayer,
     }
   ).items;
@@ -190,7 +201,7 @@ function handleCardModifyAttribute(
           evaluateConditions(conditionPayload, {
             sourceItem,
             items: allItems,
-            triggerSourceItem: context?.firedItem,
+            triggerSourceItem: context?.sourceItem,
             currentItem: targetItem,
           })
         );
