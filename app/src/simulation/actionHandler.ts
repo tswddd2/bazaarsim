@@ -51,24 +51,6 @@ export function executeAction(
       handlePlayerBurnApply(item, action, context, queue);
       return;
 
-    // TODO: Implement other action types:
-    // case "TActionPlayerHeal":
-    //   return handlePlayerHeal(item, action);
-    // case "TActionModifyItemAttribute":
-    //   return handleModifyItemAttribute(item, action);
-    // case "TActionBurn":
-    //   return handleBurn(item, action);
-    // case "TActionFreeze":
-    //   return handleFreeze(item, action);
-    // case "TActionPoison":
-    //   return handlePoison(item, action);
-    // case "TActionSlow":
-    //   return handleSlow(item, action);
-    // case "TActionHaste":
-    //   return handleHaste(item, action);
-    // case "TActionShield":
-    //   return handleShield(item, action);
-
     default:
       console.warn(`Unhandled action type: ${actionType}`);
       return;
@@ -269,76 +251,4 @@ function applyAttributeOperation(
       console.warn(`Unhandled attribute operation: ${operation}`);
       return currentValue;
   }
-}
-
-/**
- * Handle TActionPlayerHeal - heals the player
- */
-// @ts-ignore - TODO: Implement healing logic
-function handlePlayerHeal(item: DeckItem, action: any): void {
-  // TODO: Implement healing logic
-  return;
-}
-
-/**
- * Handle TActionModifyItemAttribute - modifies an item's attribute
- */
-// @ts-ignore - TODO: Implement attribute modification logic
-function handleModifyItemAttribute(item: DeckItem, action: any): void {
-  // TODO: Implement attribute modification logic
-  return;
-}
-
-/**
- * Handle TActionBurn - applies burn effect
- */
-// @ts-ignore - TODO: Implement burn logic
-function handleBurn(item: DeckItem, action: any): void {
-  // TODO: Implement burn logic
-  return;
-}
-
-/**
- * Handle TActionFreeze - applies freeze effect
- */
-// @ts-ignore - TODO: Implement freeze logic
-function handleFreeze(item: DeckItem, action: any): void {
-  // TODO: Implement freeze logic
-  return;
-}
-
-/**
- * Handle TActionPoison - applies poison effect
- */
-// @ts-ignore - TODO: Implement poison logic
-function handlePoison(item: DeckItem, action: any): void {
-  // TODO: Implement poison logic
-  return;
-}
-
-/**
- * Handle TActionSlow - applies slow effect
- */
-// @ts-ignore - TODO: Implement slow logic
-function handleSlow(item: DeckItem, action: any): void {
-  // TODO: Implement slow logic
-  return;
-}
-
-/**
- * Handle TActionHaste - applies haste effect
- */
-// @ts-ignore - TODO: Implement haste logic
-function handleHaste(item: DeckItem, action: any): void {
-  // TODO: Implement haste logic
-  return;
-}
-
-/**
- * Handle TActionShield - applies shield effect
- */
-// @ts-ignore - TODO: Implement shield logic
-function handleShield(item: DeckItem, action: any): void {
-  // TODO: Implement shield logic
-  return;
 }
