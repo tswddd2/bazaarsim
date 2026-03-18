@@ -1,4 +1,4 @@
-import type { DeckItem } from "../components/ItemDeck";
+import type { DeckItem, SimDeckItem } from "../components/ItemDeck";
 import { evaluateConditions } from "./conditionHandler";
 import { resolveSubjectTargets } from "./subjectHandler";
 import { resolveNumericValue } from "./valueHandler";
@@ -9,17 +9,15 @@ import {
 } from "./playerState";
 
 import type { SimulationQueue } from "./eventSystem";
+import type { BattleResult } from "./cooldownManager";
 
 export interface ActionContext {
-  items?: DeckItem[];
+  items: SimDeckItem[];
   sourceItem?: DeckItem;
-  players?: PlayerState;
-  sourcePlayer?: PlayerSide;
-  result?: {
-    totalDamage: number;
-    cardEvents: Array<{ time: number; uid: string; damage: number }>;
-  };
-  eventTimeSeconds?: number;
+  players: PlayerState;
+  sourcePlayer: PlayerSide;
+  result: BattleResult;
+  eventTimeSeconds: number;
 }
 
 /**
@@ -63,18 +61,10 @@ function handlePlayerBurnApply(
   queue: SimulationQueue
 ): void {
   const playerState = context.players;
-  if (!playerState) {
-    return;
-  }
 
-  const targets = resolveSubjectTargets(
-    item,
-    action?.Target,
-    context.items ?? [item],
-    {
-      sourcePlayer: context.sourcePlayer ?? "Self",
-    }
-  ).players;
+  const targets = resolveSubjectTargets(item, action?.Target, context.items, {
+    sourcePlayer: context.sourcePlayer,
+  }).players;
   if (targets.length === 0) {
     return;
   }
@@ -93,6 +83,8 @@ function handlePlayerBurnApply(
     targetStatus.Burn += burnAmount;
   }
 
+  (item as SimDeckItem).simStats.burnApplied += burnAmount;
+
   queue.emitSignal({
     signalName: "TTriggerOnCardPerformedBurn",
     sourceItem: item,
@@ -108,18 +100,10 @@ function handlePlayerPoisonApply(
   queue: SimulationQueue
 ): void {
   const playerState = context.players;
-  if (!playerState) {
-    return;
-  }
 
-  const targets = resolveSubjectTargets(
-    item,
-    action?.Target,
-    context.items ?? [item],
-    {
-      sourcePlayer: context.sourcePlayer ?? "Self",
-    }
-  ).players;
+  const targets = resolveSubjectTargets(item, action?.Target, context.items, {
+    sourcePlayer: context.sourcePlayer,
+  }).players;
   if (targets.length === 0) {
     return;
   }
@@ -138,6 +122,8 @@ function handlePlayerPoisonApply(
     targetStatus.Poison += poisonAmount;
   }
 
+  (item as SimDeckItem).simStats.poisonApplied += poisonAmount;
+
   queue.emitSignal({
     signalName: "TTriggerOnCardPerformedPoison",
     sourceItem: item,
@@ -155,7 +141,7 @@ function handleCardForceUse(
   const rawTargets = resolveSubjectTargets(
     sourceItem,
     action?.Target,
-    context.items!,
+    context.items,
     {
       triggerSourceItem: context.sourceItem,
       sourcePlayer: context.sourcePlayer,
@@ -173,7 +159,7 @@ function handleCardForceUse(
       : rawTargets.filter((targetItem) =>
           evaluateConditions(conditionPayload, {
             sourceItem,
-            items: context.items!,
+            items: context.items,
             triggerSourceItem: context.sourceItem,
             currentItem: targetItem,
           })
@@ -239,14 +225,8 @@ function handlePlayerDamage(
   const finalDamage = damage;
 
   if (finalDamage > 0) {
-    if (context.result) {
-      context.result.totalDamage += finalDamage;
-      context.result.cardEvents.push({
-        time: context.eventTimeSeconds ?? 0,
-        uid: item.uid,
-        damage: finalDamage,
-      });
-    }
+    context.result.totalDamage += finalDamage;
+    (item as SimDeckItem).simStats.weaponDamage += finalDamage;
   }
 
   return;
@@ -263,7 +243,7 @@ function handleCardModifyAttribute(
   const rawTargets = resolveSubjectTargets(
     sourceItem,
     action?.Target,
-    context.items!,
+    context.items,
     {
       triggerSourceItem: context.sourceItem,
       sourcePlayer: context.sourcePlayer,
@@ -280,7 +260,7 @@ function handleCardModifyAttribute(
       : rawTargets.filter((targetItem) =>
           evaluateConditions(conditionPayload, {
             sourceItem,
-            items: context.items!,
+            items: context.items,
             triggerSourceItem: context.sourceItem,
             currentItem: targetItem,
           })

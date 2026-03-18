@@ -1,6 +1,20 @@
 import { useState, useRef, useCallback } from "react";
 import type { CardItem } from "../types";
 
+export interface ItemStatSnapshot {
+  time: number;
+  cumulativeWeaponDamage: number;
+  cumulativeBurnApplied: number;
+  cumulativePoisonApplied: number;
+}
+
+export interface ItemSimStats {
+  weaponDamage: number;
+  burnApplied: number;
+  poisonApplied: number;
+  snapshots: ItemStatSnapshot[];
+}
+
 export interface DeckItem {
   uid: string; // unique instance id
   card: CardItem;
@@ -11,6 +25,8 @@ export interface DeckItem {
   abilityIds: string[];
   tooltipIds: number[];
 }
+
+export type SimDeckItem = DeckItem & { simStats: ItemSimStats };
 
 interface ItemDeckProps {
   items: DeckItem[];

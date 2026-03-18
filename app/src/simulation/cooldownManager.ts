@@ -1,4 +1,8 @@
-import type { DeckItem } from "../components/ItemDeck";
+import type {
+  DeckItem,
+  SimDeckItem,
+  ItemSimStats,
+} from "../components/ItemDeck";
 import { createInitialPlayerState, type PlayerState } from "./playerState";
 import { SimulationQueue } from "./eventSystem";
 
@@ -15,6 +19,7 @@ export interface SimulationState {
   timeElapsed: number; // in milliseconds
   players: PlayerState;
   queue: SimulationQueue;
+  items: SimDeckItem[];
 }
 
 /**
@@ -23,7 +28,17 @@ export interface SimulationState {
 export function initializeState(items: DeckItem[]): SimulationState {
   const cooldowns = new Map<string, CooldownState>();
 
-  for (const item of items) {
+  const simItems: SimDeckItem[] = items.map((item) => ({
+    ...item,
+    simStats: {
+      weaponDamage: 0,
+      burnApplied: 0,
+      poisonApplied: 0,
+      snapshots: [],
+    } satisfies ItemSimStats,
+  }));
+
+  for (const item of simItems) {
     const cooldownMax = item.attributes.CooldownMax;
 
     if (cooldownMax !== undefined && cooldownMax > 0) {
@@ -42,15 +57,16 @@ export function initializeState(items: DeckItem[]): SimulationState {
     timeElapsed: 0,
     players: createInitialPlayerState(),
     queue,
+    items: simItems,
   };
 }
 
 /**
  * Process a single simulation tick (0.1 seconds = 100ms)
  */
-export function tickCooldowns(state: SimulationState, items: DeckItem[]): void {
+export function tickCooldowns(state: SimulationState): void {
   // Create a map for quick item lookup
-  const itemMap = new Map(items.map((item) => [item.uid, item]));
+  const itemMap = new Map(state.items.map((item) => [item.uid, item]));
 
   // Process each item with cooldown
   state.cooldowns.forEach((cooldownState, uid) => {
@@ -88,12 +104,9 @@ export function simulateBattle(
   items: DeckItem[],
   maxTimeSeconds: number
 ): BattleResult {
-  const simulationItems = items.map((item) => ({
-    ...item,
-    attributes: { ...item.attributes },
-  }));
-
-  const state = initializeState(simulationItems);
+  const state = initializeState(
+    items.map((item) => ({ ...item, attributes: { ...item.attributes } }))
+  );
   const maxTimeMs = maxTimeSeconds * 1000;
   const tickCount = Math.floor(maxTimeMs / SIMULATION_TICK_DURATION_MS);
 
@@ -101,11 +114,11 @@ export function simulateBattle(
     totalDamage: 0,
     totalBurnDamage: 0,
     totalPoisonDamage: 0,
-    damageOverTime: [], // Array of { time, damage } for each tick
+    damageOverTime: [],
     burnOverTime: [],
     poisonOverTime: [],
-    cardEvents: [],
     playerState: state.players,
+    items: state.items,
   };
 
   // Initialize damage over time with 0 damage at time 0
@@ -122,37 +135,47 @@ export function simulateBattle(
   });
 
   // Register all triggers from all items before starting battle
-  state.queue.registerTriggers(simulationItems, {
-    items: simulationItems,
+  state.queue.registerTriggers(state.items, {
+    items: state.items,
     players: state.players,
     sourcePlayer: "Self",
     result,
+    eventTimeSeconds: 0,
   });
 
   for (let tick = 0; tick < tickCount; tick++) {
-    tickCooldowns(state, simulationItems);
+    tickCooldowns(state);
 
     state.queue.processQueues(state.timeElapsed / 1000);
 
     applyBurnTickDamage(state, result);
     applyPoisonTickDamage(state, result);
 
-    // Record cumulative damage at this time
+    // Record cumulative damage and per-item stats at this time
     const currentTime = (state.timeElapsed / 1000).toFixed(1);
+    const timeFloat = parseFloat(currentTime);
     result.damageOverTime.push({
-      time: parseFloat(currentTime),
+      time: timeFloat,
       cumulativeDamage: result.totalDamage,
       cumulativeBurnDamage: result.totalBurnDamage,
       cumulativePoisonDamage: result.totalPoisonDamage,
     });
     result.burnOverTime.push({
-      time: parseFloat(currentTime),
+      time: timeFloat,
       burn: state.players.opponent.Burn,
     });
     result.poisonOverTime.push({
-      time: parseFloat(currentTime),
+      time: timeFloat,
       poison: state.players.opponent.Poison,
     });
+    for (const item of state.items) {
+      item.simStats.snapshots.push({
+        time: timeFloat,
+        cumulativeWeaponDamage: item.simStats.weaponDamage,
+        cumulativeBurnApplied: item.simStats.burnApplied,
+        cumulativePoisonApplied: item.simStats.poisonApplied,
+      });
+    }
   }
 
   return result;
@@ -170,14 +193,8 @@ export interface BattleResult {
   }>;
   burnOverTime: Array<{ time: number; burn: number }>;
   poisonOverTime: Array<{ time: number; poison: number }>;
-  cardEvents: BattleCardEvent[];
   playerState: PlayerState;
-}
-
-export interface BattleCardEvent {
-  time: number;
-  uid: string;
-  damage: number;
+  items: SimDeckItem[];
 }
 
 function applyBurnTickDamage(

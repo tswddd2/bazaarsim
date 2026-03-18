@@ -1,4 +1,4 @@
-import type { DeckItem } from "./ItemDeck";
+import type { DeckItem, SimDeckItem } from "./ItemDeck";
 import type { BattleResult } from "../simulation/cooldownManager";
 
 interface SimulationPanelProps {
@@ -50,23 +50,24 @@ export default function SimulationPanel({
 
   const stats = getStatsAtTime(simulationTime);
 
-  const selectedItemStats = battleResult
-    ? battleResult.cardEvents
-        .filter(
-          (event) =>
-            selectedSimulationItem &&
-            event.uid === selectedSimulationItem.uid &&
-            event.time <= simulationTime
-        )
-        .reduce(
-          (acc, event) => {
-            acc.hits += 1;
-            acc.damage += event.damage;
-            return acc;
-          },
-          { hits: 0, damage: 0 }
-        )
-    : { hits: 0, damage: 0 };
+  const selectedSimStats = (() => {
+    if (!selectedSimulationItem) return null;
+    const simItem = battleResult.items.find(
+      (i) => i.uid === selectedSimulationItem.uid
+    ) as SimDeckItem | undefined;
+    if (!simItem || simItem.simStats.snapshots.length === 0)
+      return {
+        cumulativeWeaponDamage: 0,
+        cumulativeBurnApplied: 0,
+        cumulativePoisonApplied: 0,
+      };
+    return simItem.simStats.snapshots.reduce((prev, curr) =>
+      Math.abs(curr.time - simulationTime) <
+      Math.abs(prev.time - simulationTime)
+        ? curr
+        : prev
+    );
+  })();
 
   return (
     <div className="simulation-panel">
@@ -208,24 +209,39 @@ export default function SimulationPanel({
                 <span className="panel-empty">Click an item in deck</span>
               )}
             </div>
-            <table className="sim-table">
-              <thead>
-                <tr>
-                  <th>Stat</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="sim-row">
-                  <td>Hits</td>
-                  <td>{selectedItemStats.hits}</td>
-                </tr>
-                <tr className="sim-row">
-                  <td>Damage</td>
-                  <td>{selectedItemStats.damage}</td>
-                </tr>
-              </tbody>
-            </table>
+            {selectedSimStats && (
+              <table className="sim-table">
+                <thead>
+                  <tr>
+                    <th>Stat</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="sim-row sim-row--weapon">
+                    <td>
+                      <span className="sim-dot sim-dot--weapon" />
+                      Weapon Dmg
+                    </td>
+                    <td>{selectedSimStats.cumulativeWeaponDamage}</td>
+                  </tr>
+                  <tr className="sim-row sim-row--burn">
+                    <td>
+                      <span className="sim-dot sim-dot--burn" />
+                      Burn Applied
+                    </td>
+                    <td>{selectedSimStats.cumulativeBurnApplied}</td>
+                  </tr>
+                  <tr className="sim-row sim-row--poison">
+                    <td>
+                      <span className="sim-dot sim-dot--poison" />
+                      Poison Applied
+                    </td>
+                    <td>{selectedSimStats.cumulativePoisonApplied}</td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
