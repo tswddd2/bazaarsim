@@ -13,7 +13,6 @@ import {
   type BattleResult,
 } from "../simulation/cooldownManager";
 
-let uidCounter = 0;
 const DECK_STORAGE_KEY = "bazaarsim_deck";
 
 function computeTierData(card: CardItem, targetTier: string) {
@@ -57,7 +56,7 @@ function findBestSlotForCard(
   newCard: CardItem
 ): DeckItem[] | null {
   const slotSize = getSlotSize(newCard);
-  const tempUid = `new-item-${++uidCounter}`;
+  const tempUid = crypto.randomUUID();
 
   // Initialize tier and attributes
   const tiers = Object.keys(newCard.Tiers || {});
@@ -70,14 +69,18 @@ function findBestSlotForCard(
   );
 
   // Use the new add item layout logic
-  return handleAddItemLayout(deckItems, {
-    card: newCard,
-    slotSize,
-    tier: startingTier,
-    attributes,
-    abilityIds,
-    tooltipIds,
-  }, tempUid);
+  return handleAddItemLayout(
+    deckItems,
+    {
+      card: newCard,
+      slotSize,
+      tier: startingTier,
+      attributes,
+      abilityIds,
+      tooltipIds,
+    },
+    tempUid
+  );
 }
 
 const loadDeckFromStorage = (): DeckItem[] => {
@@ -85,12 +88,6 @@ const loadDeckFromStorage = (): DeckItem[] => {
     const stored = localStorage.getItem(DECK_STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as DeckItem[];
-      // Update uidCounter to avoid collisions
-      const maxUid = parsed.reduce((max, item) => {
-        const num = parseInt(item.uid.split("-")[1], 10);
-        return Math.max(max, isNaN(num) ? 0 : num);
-      }, 0);
-      uidCounter = maxUid;
       // Back-fill startSlot for saves that pre-date the slot positioning feature
       let cursor = 0;
       return parsed.map((item) => {
@@ -148,12 +145,7 @@ export default function DeckPage() {
           setTimeout(() => setShowFullWarning(false), 3000);
           return prev; // No space available
         }
-        // Replace the temp UID with a real one
-        return bestLayout.map((item) =>
-          item.uid === "temp-new-item"
-            ? { ...item, uid: `deck-${++uidCounter}` }
-            : item
-        );
+        return bestLayout;
       });
     },
     [isSimulating]
@@ -294,11 +286,6 @@ export default function DeckPage() {
               >
                 {isSimulating ? "Hide Simulation" : "Simulate"}
               </button>
-              {showFullWarning && (
-                <div className="deck-full-warning">
-                  Not enough room in deck!
-                </div>
-              )}
             </div>
 
             <ItemDeck
@@ -308,6 +295,7 @@ export default function DeckPage() {
               onSelect={setSelectedUid}
               selectedUid={selectedUid || undefined}
               isSimulating={isSimulating}
+              showFullWarning={showFullWarning}
             />
 
             {isSimulating && (
