@@ -34,6 +34,10 @@ export function triggerAbilityListener(
       handleOnCardFiredTrigger(params);
       return;
 
+    case "TTriggerOnBeforeItemUsed":
+      handleOnBeforeItemUsedTrigger(params);
+      return;
+
     case "TTriggerOnItemUsed":
       handleOnItemUsedTrigger(params);
       return;
@@ -61,19 +65,15 @@ function handleOnCardFiredTrigger({
   queue.pushAction({ item, action: ability.Action, context });
 }
 
-function handleOnItemUsedTrigger({
+function handleOnBeforeItemUsedTrigger({
   item,
   ability,
   event,
   context,
   queue,
 }: TriggerHandlerParams): void {
-  const firedItem = event.sourceItem;
+  const firedItem = event.sourceItem!;
   const items = context.items;
-
-  if (!firedItem || !items) {
-    return;
-  }
 
   const subject = ability?.Trigger?.Subject;
   const subjectItems = resolveSubjectTargets(item, subject, items, {
@@ -81,11 +81,34 @@ function handleOnItemUsedTrigger({
     sourcePlayer: context.sourcePlayer,
   }).items;
 
-  const shouldTrigger = subjectItems.some(
-    (subjectItem: DeckItem) => subjectItem.uid === firedItem.uid
-  );
+  if (!subjectItems.map((i) => i.uid).includes(firedItem.uid)) {
+    return;
+  }
 
-  if (!shouldTrigger) {
+  queue.pushAction({
+    item,
+    action: ability.Action,
+    context: { ...context, sourceItem: firedItem },
+  });
+}
+
+function handleOnItemUsedTrigger({
+  item,
+  ability,
+  event,
+  context,
+  queue,
+}: TriggerHandlerParams): void {
+  const firedItem = event.sourceItem!;
+  const items = context.items;
+
+  const subject = ability?.Trigger?.Subject;
+  const subjectItems = resolveSubjectTargets(item, subject, items, {
+    triggerSourceItem: firedItem,
+    sourcePlayer: context.sourcePlayer,
+  }).items;
+
+  if (!subjectItems.map((i) => i.uid).includes(firedItem.uid)) {
     return;
   }
 
@@ -103,12 +126,8 @@ function handleOnCardPerformedBurnTrigger({
   context,
   queue,
 }: TriggerHandlerParams): void {
-  const firedItem = event.sourceItem;
+  const firedItem = event.sourceItem!;
   const items = context.items;
-
-  if (!firedItem || !items) {
-    return;
-  }
 
   const subject = ability?.Trigger?.Subject;
   const subjectItems = resolveSubjectTargets(item, subject, items, {
@@ -116,11 +135,7 @@ function handleOnCardPerformedBurnTrigger({
     sourcePlayer: context.sourcePlayer,
   }).items;
 
-  const shouldTrigger = subjectItems.some(
-    (subjectItem: DeckItem) => subjectItem.uid === firedItem.uid
-  );
-
-  if (!shouldTrigger) {
+  if (!subjectItems.map((i) => i.uid).includes(firedItem.uid)) {
     return;
   }
 
@@ -138,12 +153,8 @@ function handleOnCardPerformedPoisonTrigger({
   context,
   queue,
 }: TriggerHandlerParams): void {
-  const firedItem = event.sourceItem;
+  const firedItem = event.sourceItem!;
   const items = context.items;
-
-  if (!firedItem || !items) {
-    return;
-  }
 
   const subject = ability?.Trigger?.Subject;
   const subjectItems = resolveSubjectTargets(item, subject, items, {
@@ -151,14 +162,9 @@ function handleOnCardPerformedPoisonTrigger({
     sourcePlayer: context.sourcePlayer,
   }).items;
 
-  const shouldTrigger = subjectItems.some(
-    (subjectItem: DeckItem) => subjectItem.uid === firedItem.uid
-  );
-
-  if (!shouldTrigger) {
+  if (!subjectItems.map((i) => i.uid).includes(firedItem.uid)) {
     return;
   }
-
   queue.pushAction({
     item,
     action: ability.Action,

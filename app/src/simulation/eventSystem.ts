@@ -37,6 +37,30 @@ export class SimulationQueue {
   public registerTriggers(items: DeckItem[], context: ActionContext) {
     for (const item of items) {
       if (!item.abilityIds || item.abilityIds.length === 0) continue;
+
+      let hasCardFired = false;
+      for (const abilityId of item.abilityIds) {
+        const ability = (item.card.Abilities as any)?.[abilityId];
+        if (
+          ability &&
+          ability.Trigger &&
+          ability.Trigger.$type === "TTriggerOnCardFired"
+        ) {
+          hasCardFired = true;
+          break;
+        }
+      }
+
+      if (hasCardFired) {
+        this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
+          this.pushAction({
+            item,
+            action: { $type: "TActionBeforeItemUsed" },
+            context,
+          });
+        });
+      }
+
       for (const abilityId of item.abilityIds) {
         const ability = (item.card.Abilities as any)?.[abilityId];
         if (!ability || !ability.Trigger) continue;
@@ -49,6 +73,16 @@ export class SimulationQueue {
 
         this.on(signalName, (event) => {
           triggerAbilityListener(item, ability, event, context, this);
+        });
+      }
+
+      if (hasCardFired) {
+        this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
+          this.pushAction({
+            item,
+            action: { $type: "TActionItemUsed" },
+            context,
+          });
         });
       }
     }

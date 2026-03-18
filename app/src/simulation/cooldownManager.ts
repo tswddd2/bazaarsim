@@ -30,6 +30,7 @@ export function initializeState(items: DeckItem[]): SimulationState {
       weaponDamage: 0,
       burnApplied: 0,
       poisonApplied: 0,
+      itemUsed: 0,
     },
     snapshots: [],
   }));
@@ -77,10 +78,6 @@ export function tickCooldowns(state: SimulationState): void {
       // Emit signals for the fired item
       state.queue.emitSignal({
         signalName: `TTriggerOnCardFired-${item.uid}`,
-        sourceItem: item,
-      });
-      state.queue.emitSignal({
-        signalName: "TTriggerOnItemUsed",
         sourceItem: item,
       });
 
@@ -167,7 +164,7 @@ export function simulateBattle(
     for (const item of state.items) {
       item.snapshots.push({
         time: timeFloat,
-        stats: item.simStats,
+        stats: { ...item.simStats },
       });
     }
   }

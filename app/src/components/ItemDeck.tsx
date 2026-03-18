@@ -10,6 +10,7 @@ export interface ItemSimStats {
   weaponDamage: number;
   burnApplied: number;
   poisonApplied: number;
+  itemUsed: number;
 }
 
 export interface DeckItem {

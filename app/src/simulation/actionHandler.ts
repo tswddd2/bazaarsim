@@ -38,20 +38,51 @@ export function executeAction(
 
   switch (actionType) {
     case "TActionPlayerDamage":
-      return handlePlayerDamage(item, action, context);
+      return handlePlayerDamage(item, action, context, queue);
     case "TActionCardModifyAttribute":
-      return handleCardModifyAttribute(item, action, context);
+      return handleCardModifyAttribute(item, action, context, queue);
     case "TActionPlayerBurnApply":
       return handlePlayerBurnApply(item, action, context, queue);
     case "TActionPlayerPoisonApply":
       return handlePlayerPoisonApply(item, action, context, queue);
     case "TActionCardForceUse":
       return handleCardForceUse(item, action, context, queue);
+    case "TActionBeforeItemUsed":
+      return handleActionBeforeItemUsed(item, action, context, queue);
+    case "TActionItemUsed":
+      return handleActionItemUsed(item, action, context, queue);
 
     default:
       console.warn(`Unhandled action type: ${actionType}`);
       return;
   }
+}
+
+function handleActionBeforeItemUsed(
+  item: DeckItem,
+  _action: any,
+  _context: ActionContext,
+  queue: SimulationQueue
+): void {
+  queue.emitSignal({
+    signalName: "TTriggerOnBeforeItemUsed",
+    sourceItem: item,
+  });
+}
+
+function handleActionItemUsed(
+  item: DeckItem,
+  _action: any,
+  _context: ActionContext,
+  queue: SimulationQueue
+): void {
+  const simItem = item as SimDeckItem;
+  simItem.simStats.itemUsed += 1;
+
+  queue.emitSignal({
+    signalName: "TTriggerOnItemUsed",
+    sourceItem: item,
+  });
 }
 
 function handlePlayerBurnApply(
@@ -200,7 +231,8 @@ function handleCardForceUse(
 function handlePlayerDamage(
   item: DeckItem,
   action: any,
-  context: ActionContext
+  context: ActionContext,
+  _queue: SimulationQueue
 ): void {
   const damage =
     action?.ReferenceValue == null
@@ -238,7 +270,8 @@ function handlePlayerDamage(
 function handleCardModifyAttribute(
   sourceItem: DeckItem,
   action: any,
-  context: ActionContext
+  context: ActionContext,
+  _queue: SimulationQueue
 ): void {
   const rawTargets = resolveSubjectTargets(
     sourceItem,

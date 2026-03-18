@@ -234,6 +234,10 @@ export default function SimulationPanel({
                     </td>
                     <td>{selectedSimStats.poisonApplied}</td>
                   </tr>
+                  <tr className="sim-row">
+                    <td>Times Used</td>
+                    <td>{selectedSimStats.itemUsed}</td>
+                  </tr>
                 </tbody>
               </table>
             )}
