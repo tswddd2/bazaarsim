@@ -204,7 +204,7 @@ export default function SimulationPanel({
                 <span className="panel-empty">Click an item in deck</span>
               )}
             </div>
-            {selectedSimStats && (
+            {selectedSimulationItem && selectedSimStats && (
               <table className="sim-table">
                 <thead>
                   <tr>
@@ -213,27 +213,35 @@ export default function SimulationPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="sim-row sim-row--weapon">
-                    <td>
-                      <span className="sim-dot sim-dot--weapon" />
-                      Weapon Dmg
-                    </td>
-                    <td>{selectedSimStats.weaponDamage}</td>
-                  </tr>
-                  <tr className="sim-row sim-row--burn">
-                    <td>
-                      <span className="sim-dot sim-dot--burn" />
-                      Burn Applied
-                    </td>
-                    <td>{selectedSimStats.burnApplied}</td>
-                  </tr>
-                  <tr className="sim-row sim-row--poison">
-                    <td>
-                      <span className="sim-dot sim-dot--poison" />
-                      Poison Applied
-                    </td>
-                    <td>{selectedSimStats.poisonApplied}</td>
-                  </tr>
+                  {selectedSimulationItem.card.Tags?.includes("Weapon") && (
+                    <tr className="sim-row sim-row--weapon">
+                      <td>
+                        <span className="sim-dot sim-dot--weapon" />
+                        Weapon Dmg
+                      </td>
+                      <td>{selectedSimStats.weaponDamage}</td>
+                    </tr>
+                  )}
+                  {selectedSimulationItem.card.HiddenTags?.includes("Burn") && (
+                    <tr className="sim-row sim-row--burn">
+                      <td>
+                        <span className="sim-dot sim-dot--burn" />
+                        Burn Applied
+                      </td>
+                      <td>{selectedSimStats.burnApplied}</td>
+                    </tr>
+                  )}
+                  {selectedSimulationItem.card.HiddenTags?.includes(
+                    "Poison"
+                  ) && (
+                    <tr className="sim-row sim-row--poison">
+                      <td>
+                        <span className="sim-dot sim-dot--poison" />
+                        Poison Applied
+                      </td>
+                      <td>{selectedSimStats.poisonApplied}</td>
+                    </tr>
+                  )}
                   <tr className="sim-row">
                     <td>Times Used</td>
                     <td>{selectedSimStats.itemUsed}</td>
