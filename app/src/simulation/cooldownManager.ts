@@ -1,8 +1,4 @@
-import type {
-  DeckItem,
-  SimDeckItem,
-  ItemSimStats,
-} from "../components/ItemDeck";
+import type { DeckItem, SimDeckItem } from "../components/ItemDeck";
 import { createInitialPlayerState, type PlayerState } from "./playerState";
 import { SimulationQueue } from "./eventSystem";
 
@@ -34,8 +30,8 @@ export function initializeState(items: DeckItem[]): SimulationState {
       weaponDamage: 0,
       burnApplied: 0,
       poisonApplied: 0,
-      snapshots: [],
-    } satisfies ItemSimStats,
+    },
+    snapshots: [],
   }));
 
   for (const item of simItems) {
@@ -169,11 +165,9 @@ export function simulateBattle(
       poison: state.players.opponent.Poison,
     });
     for (const item of state.items) {
-      item.simStats.snapshots.push({
+      item.snapshots.push({
         time: timeFloat,
-        cumulativeWeaponDamage: item.simStats.weaponDamage,
-        cumulativeBurnApplied: item.simStats.burnApplied,
-        cumulativePoisonApplied: item.simStats.poisonApplied,
+        stats: item.simStats,
       });
     }
   }

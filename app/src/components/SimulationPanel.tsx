@@ -55,18 +55,13 @@ export default function SimulationPanel({
     const simItem = battleResult.items.find(
       (i) => i.uid === selectedSimulationItem.uid
     ) as SimDeckItem | undefined;
-    if (!simItem || simItem.simStats.snapshots.length === 0)
-      return {
-        cumulativeWeaponDamage: 0,
-        cumulativeBurnApplied: 0,
-        cumulativePoisonApplied: 0,
-      };
-    return simItem.simStats.snapshots.reduce((prev, curr) =>
+    if (!simItem || simItem.snapshots.length === 0) return null;
+    return simItem.snapshots.reduce((prev, curr) =>
       Math.abs(curr.time - simulationTime) <
       Math.abs(prev.time - simulationTime)
         ? curr
         : prev
-    );
+    ).stats;
   })();
 
   return (
@@ -223,21 +218,21 @@ export default function SimulationPanel({
                       <span className="sim-dot sim-dot--weapon" />
                       Weapon Dmg
                     </td>
-                    <td>{selectedSimStats.cumulativeWeaponDamage}</td>
+                    <td>{selectedSimStats.weaponDamage}</td>
                   </tr>
                   <tr className="sim-row sim-row--burn">
                     <td>
                       <span className="sim-dot sim-dot--burn" />
                       Burn Applied
                     </td>
-                    <td>{selectedSimStats.cumulativeBurnApplied}</td>
+                    <td>{selectedSimStats.burnApplied}</td>
                   </tr>
                   <tr className="sim-row sim-row--poison">
                     <td>
                       <span className="sim-dot sim-dot--poison" />
                       Poison Applied
                     </td>
-                    <td>{selectedSimStats.cumulativePoisonApplied}</td>
+                    <td>{selectedSimStats.poisonApplied}</td>
                   </tr>
                 </tbody>
               </table>

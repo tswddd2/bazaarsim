@@ -1,18 +1,15 @@
 import { useState, useRef, useCallback } from "react";
 import type { CardItem } from "../types";
 
-export interface ItemStatSnapshot {
+export interface ItemSimSnapshot {
   time: number;
-  cumulativeWeaponDamage: number;
-  cumulativeBurnApplied: number;
-  cumulativePoisonApplied: number;
+  stats: ItemSimStats;
 }
 
 export interface ItemSimStats {
   weaponDamage: number;
   burnApplied: number;
   poisonApplied: number;
-  snapshots: ItemStatSnapshot[];
 }
 
 export interface DeckItem {
@@ -26,7 +23,10 @@ export interface DeckItem {
   tooltipIds: number[];
 }
 
-export type SimDeckItem = DeckItem & { simStats: ItemSimStats };
+export type SimDeckItem = DeckItem & {
+  simStats: ItemSimStats;
+  snapshots: ItemSimSnapshot[];
+};
 
 interface ItemDeckProps {
   items: DeckItem[];
@@ -43,8 +43,9 @@ const TOTAL_SLOTS = 10;
 function getSlotSize(card: CardItem): number {
   const size = card.Size?.toLowerCase();
   if (size === "small") return 1;
+  if (size === "medium") return 2;
   if (size === "large") return 3;
-  return 2; // Medium or default
+  return 1;
 }
 
 function buildOccupancy(items: DeckItem[], excludeUid?: string): boolean[] {
