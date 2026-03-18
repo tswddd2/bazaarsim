@@ -68,18 +68,7 @@ export class SimulationQueue {
     for (const item of items) {
       if (!item.abilityIds || item.abilityIds.length === 0) continue;
 
-      let hasCardFired = false;
-      for (const abilityId of item.abilityIds) {
-        const ability = (item.card.Abilities as any)?.[abilityId];
-        if (
-          ability &&
-          ability.Trigger &&
-          ability.Trigger.$type === "TTriggerOnCardFired"
-        ) {
-          hasCardFired = true;
-          break;
-        }
-      }
+      let hasCooldown = item.attributes.CooldownMax && item.attributes.CooldownMax > 0;
 
       // Pre-create stable action objects so ICD state is preserved across firings
       const beforeUsedAction = {
@@ -93,7 +82,7 @@ export class SimulationQueue {
         stack: 0,
       };
 
-      if (hasCardFired) {
+      if (hasCooldown) {
         this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
           this.pushAction({ item, action: beforeUsedAction, context });
         });
@@ -114,7 +103,7 @@ export class SimulationQueue {
         });
       }
 
-      if (hasCardFired) {
+      if (hasCooldown) {
         this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
           this.pushAction({ item, action: itemUsedAction, context });
         });
