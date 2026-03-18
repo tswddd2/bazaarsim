@@ -46,6 +46,8 @@ export function resolveSubjectTargets(
       return resolveTargetCardTriggerSourceCase(context);
     case "TTargetPlayerRelative":
       return resolveTargetPlayerRelativeCase(subject, sourcePlayer);
+    case "TTargetCardSection":
+      return resolveTargetCardSectionCase(sourceItem, subject, items, context);
 
     default:
       console.warn(`Unhandled subject target type: ${subject?.$type}`);
@@ -104,6 +106,51 @@ function resolveTargetPlayerRelativeCase(
     `Unhandled TTargetPlayerRelative target mode: ${subject?.TargetMode}`
   );
   return EMPTY_SUBJECT_TARGETS;
+}
+
+function resolveTargetCardSectionCase(
+  sourceItem: DeckItem,
+  subject: any,
+  items: DeckItem[],
+  context?: SubjectContext
+): ResolvedSubjectTargets {
+  const targetSection = subject?.TargetSection;
+
+  let targets: DeckItem[];
+
+  switch (targetSection) {
+    case "OpponentBoard":
+      targets = [];
+      break;
+    case "SelfBoard":
+      targets = [...items];
+      break;
+    default:
+      console.warn(
+        `Unhandled TTargetCardSection target section: ${targetSection}`
+      );
+      targets = [];
+  }
+
+  if (subject?.ExcludeSelf) {
+    targets = targets.filter((item) => item.uid !== sourceItem.uid);
+  }
+
+  if (subject?.Conditions != null) {
+    targets = targets.filter((targetItem) =>
+      evaluateConditions(subject.Conditions, {
+        sourceItem,
+        items,
+        triggerSourceItem: context?.triggerSourceItem,
+        currentItem: targetItem,
+      })
+    );
+  }
+
+  return {
+    items: uniqueByUid(targets),
+    players: [],
+  };
 }
 
 function resolvePositionalTargets(

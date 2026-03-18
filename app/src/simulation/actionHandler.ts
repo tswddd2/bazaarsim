@@ -28,8 +28,8 @@ export interface ActionContext {
 export function executeAction(
   item: DeckItem,
   action: any,
-  context?: ActionContext,
-  queue?: SimulationQueue
+  context: ActionContext,
+  queue: SimulationQueue
 ): void {
   if (!action) {
     console.warn("No action to execute");
@@ -40,20 +40,15 @@ export function executeAction(
 
   switch (actionType) {
     case "TActionPlayerDamage":
-      handlePlayerDamage(item, action, context);
-      return;
-
+      return handlePlayerDamage(item, action, context);
     case "TActionCardModifyAttribute":
-      handleCardModifyAttribute(item, action, context);
-      return;
-
+      return handleCardModifyAttribute(item, action, context);
     case "TActionPlayerBurnApply":
-      handlePlayerBurnApply(item, action, context, queue);
-      return;
-
+      return handlePlayerBurnApply(item, action, context, queue);
     case "TActionPlayerPoisonApply":
-      handlePlayerPoisonApply(item, action, context, queue);
-      return;
+      return handlePlayerPoisonApply(item, action, context, queue);
+    case "TActionCardForceUse":
+      return handleCardForceUse(item, action, context, queue);
 
     default:
       console.warn(`Unhandled action type: ${actionType}`);
@@ -64,10 +59,10 @@ export function executeAction(
 function handlePlayerBurnApply(
   item: DeckItem,
   action: any,
-  context?: ActionContext,
-  queue?: SimulationQueue
+  context: ActionContext,
+  queue: SimulationQueue
 ): void {
-  const playerState = context?.players;
+  const playerState = context.players;
   if (!playerState) {
     return;
   }
@@ -75,9 +70,9 @@ function handlePlayerBurnApply(
   const targets = resolveSubjectTargets(
     item,
     action?.Target,
-    context?.items ?? [item],
+    context.items ?? [item],
     {
-      sourcePlayer: context?.sourcePlayer ?? "Self",
+      sourcePlayer: context.sourcePlayer ?? "Self",
     }
   ).players;
   if (targets.length === 0) {
@@ -98,12 +93,10 @@ function handlePlayerBurnApply(
     targetStatus.Burn += burnAmount;
   }
 
-  if (queue) {
-    queue.emitSignal({
-      signalName: "TTriggerOnCardPerformedBurn",
-      sourceItem: item,
-    });
-  }
+  queue.emitSignal({
+    signalName: "TTriggerOnCardPerformedBurn",
+    sourceItem: item,
+  });
 
   return;
 }
@@ -111,10 +104,10 @@ function handlePlayerBurnApply(
 function handlePlayerPoisonApply(
   item: DeckItem,
   action: any,
-  context?: ActionContext,
-  queue?: SimulationQueue
+  context: ActionContext,
+  queue: SimulationQueue
 ): void {
-  const playerState = context?.players;
+  const playerState = context.players;
   if (!playerState) {
     return;
   }
@@ -122,9 +115,9 @@ function handlePlayerPoisonApply(
   const targets = resolveSubjectTargets(
     item,
     action?.Target,
-    context?.items ?? [item],
+    context.items ?? [item],
     {
-      sourcePlayer: context?.sourcePlayer ?? "Self",
+      sourcePlayer: context.sourcePlayer ?? "Self",
     }
   ).players;
   if (targets.length === 0) {
@@ -145,10 +138,69 @@ function handlePlayerPoisonApply(
     targetStatus.Poison += poisonAmount;
   }
 
-  if (queue) {
+  queue.emitSignal({
+    signalName: "TTriggerOnCardPerformedPoison",
+    sourceItem: item,
+  });
+
+  return;
+}
+
+function handleCardForceUse(
+  sourceItem: DeckItem,
+  action: any,
+  context: ActionContext,
+  queue: SimulationQueue
+): void {
+  const rawTargets = resolveSubjectTargets(
+    sourceItem,
+    action?.Target,
+    context.items!,
+    {
+      triggerSourceItem: context.sourceItem,
+      sourcePlayer: context.sourcePlayer,
+    }
+  ).items;
+
+  if (rawTargets.length === 0) {
+    return;
+  }
+
+  const conditionPayload = action?.Target?.Conditions;
+  const filteredTargets =
+    conditionPayload == null
+      ? rawTargets
+      : rawTargets.filter((targetItem) =>
+          evaluateConditions(conditionPayload, {
+            sourceItem,
+            items: context.items!,
+            triggerSourceItem: context.sourceItem,
+            currentItem: targetItem,
+          })
+        );
+
+  const targetCount =
+    typeof action?.TargetCount === "number" ? action.TargetCount : null;
+
+  let targetsToUse = filteredTargets;
+  if (targetCount !== null && targetCount < filteredTargets.length) {
+    const shuffledTargets = [...filteredTargets];
+
+    for (let i = shuffledTargets.length - 1; i > 0; i--) {
+      const randomIndex = Math.floor(Math.random() * (i + 1));
+      [shuffledTargets[i], shuffledTargets[randomIndex]] = [
+        shuffledTargets[randomIndex],
+        shuffledTargets[i],
+      ];
+    }
+
+    targetsToUse = shuffledTargets.slice(0, targetCount);
+  }
+
+  for (const targetItem of targetsToUse) {
     queue.emitSignal({
-      signalName: "TTriggerOnCardPerformedPoison",
-      sourceItem: item,
+      signalName: `TTriggerOnCardFired-${targetItem.uid}`,
+      sourceItem: targetItem,
     });
   }
 
@@ -162,7 +214,7 @@ function handlePlayerPoisonApply(
 function handlePlayerDamage(
   item: DeckItem,
   action: any,
-  context?: ActionContext
+  context: ActionContext
 ): void {
   const damage =
     action?.ReferenceValue == null
@@ -175,7 +227,7 @@ function handlePlayerDamage(
     action?.Target?.Conditions === null;
 
   if (!isOpponentRelativeTarget) {
-    console.log("Unhandled TActionPlayerDamage target:", action?.Target);
+    console.warn("Unhandled TActionPlayerDamage target:", action?.Target);
     return;
   }
 
@@ -187,7 +239,7 @@ function handlePlayerDamage(
   const finalDamage = damage;
 
   if (finalDamage > 0) {
-    if (context?.result) {
+    if (context.result) {
       context.result.totalDamage += finalDamage;
       context.result.cardEvents.push({
         time: context.eventTimeSeconds ?? 0,
@@ -206,20 +258,15 @@ function handlePlayerDamage(
 function handleCardModifyAttribute(
   sourceItem: DeckItem,
   action: any,
-  context?: ActionContext
+  context: ActionContext
 ): void {
-  const allItems = context?.items;
-  if (!allItems || allItems.length === 0) {
-    return;
-  }
-
   const rawTargets = resolveSubjectTargets(
     sourceItem,
     action?.Target,
-    allItems,
+    context.items!,
     {
-      triggerSourceItem: context?.sourceItem,
-      sourcePlayer: context?.sourcePlayer,
+      triggerSourceItem: context.sourceItem,
+      sourcePlayer: context.sourcePlayer,
     }
   ).items;
   if (rawTargets.length === 0) {
@@ -233,8 +280,8 @@ function handleCardModifyAttribute(
       : rawTargets.filter((targetItem) =>
           evaluateConditions(conditionPayload, {
             sourceItem,
-            items: allItems,
-            triggerSourceItem: context?.sourceItem,
+            items: context.items!,
+            triggerSourceItem: context.sourceItem,
             currentItem: targetItem,
           })
         );
