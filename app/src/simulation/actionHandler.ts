@@ -51,6 +51,10 @@ export function executeAction(
       handlePlayerBurnApply(item, action, context, queue);
       return;
 
+    case "TActionPlayerPoisonApply":
+      handlePlayerPoisonApply(item, action, context, queue);
+      return;
+
     default:
       console.warn(`Unhandled action type: ${actionType}`);
       return;
@@ -97,6 +101,53 @@ function handlePlayerBurnApply(
   if (queue) {
     queue.emitSignal({
       signalName: "TTriggerOnCardPerformedBurn",
+      sourceItem: item,
+    });
+  }
+
+  return;
+}
+
+function handlePlayerPoisonApply(
+  item: DeckItem,
+  action: any,
+  context?: ActionContext,
+  queue?: SimulationQueue
+): void {
+  const playerState = context?.players;
+  if (!playerState) {
+    return;
+  }
+
+  const targets = resolveSubjectTargets(
+    item,
+    action?.Target,
+    context?.items ?? [item],
+    {
+      sourcePlayer: context?.sourcePlayer ?? "Self",
+    }
+  ).players;
+  if (targets.length === 0) {
+    return;
+  }
+
+  const poisonAmount =
+    action?.ReferenceValue == null
+      ? item.attributes.PoisonApplyAmount ?? 0
+      : resolveNumericValue(item, action.ReferenceValue, context);
+
+  if (poisonAmount <= 0) {
+    return;
+  }
+
+  for (const targetSide of targets) {
+    const targetStatus = getPlayerStatusBySide(playerState, targetSide);
+    targetStatus.Poison += poisonAmount;
+  }
+
+  if (queue) {
+    queue.emitSignal({
+      signalName: "TTriggerOnCardPerformedPoison",
       sourceItem: item,
     });
   }

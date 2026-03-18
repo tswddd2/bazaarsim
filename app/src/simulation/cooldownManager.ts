@@ -101,6 +101,7 @@ export function simulateBattle(
     totalDamage: 0,
     damageOverTime: [], // Array of { time, damage } for each tick
     burnOverTime: [],
+    poisonOverTime: [],
     cardEvents: [],
     playerState: state.players,
   };
@@ -108,6 +109,10 @@ export function simulateBattle(
   // Initialize damage over time with 0 damage at time 0
   result.damageOverTime.push({ time: 0, cumulativeDamage: 0 });
   result.burnOverTime.push({ time: 0, burn: state.players.opponent.Burn });
+  result.poisonOverTime.push({
+    time: 0,
+    poison: state.players.opponent.Poison,
+  });
 
   // Register all triggers from all items before starting battle
   state.queue.registerTriggers(simulationItems, {
@@ -123,6 +128,7 @@ export function simulateBattle(
     state.queue.processQueues(state.timeElapsed / 1000);
 
     applyBurnTickDamage(state, result);
+    applyPoisonTickDamage(state, result);
 
     // Record cumulative damage at this time
     const currentTime = (state.timeElapsed / 1000).toFixed(1);
@@ -134,6 +140,10 @@ export function simulateBattle(
       time: parseFloat(currentTime),
       burn: state.players.opponent.Burn,
     });
+    result.poisonOverTime.push({
+      time: parseFloat(currentTime),
+      poison: state.players.opponent.Poison,
+    });
   }
 
   return result;
@@ -143,6 +153,7 @@ export interface BattleResult {
   totalDamage: number;
   damageOverTime: Array<{ time: number; cumulativeDamage: number }>;
   burnOverTime: Array<{ time: number; burn: number }>;
+  poisonOverTime: Array<{ time: number; poison: number }>;
   cardEvents: BattleCardEvent[];
   playerState: PlayerState;
 }
@@ -171,4 +182,21 @@ function applyBurnTickDamage(
 
   const decay = Math.max(1, Math.round(opponentBurn * 0.05));
   state.players.opponent.Burn = Math.max(0, opponentBurn - decay);
+}
+
+function applyPoisonTickDamage(
+  state: SimulationState,
+  result: BattleResult
+): void {
+  const POISON_TICK_MS = 1000;
+  if (state.timeElapsed % POISON_TICK_MS !== 0 || state.timeElapsed === 0) {
+    return;
+  }
+
+  const opponentPoison = state.players.opponent.Poison;
+  if (opponentPoison <= 0) {
+    return;
+  }
+
+  result.totalDamage += opponentPoison;
 }

@@ -42,6 +42,10 @@ export function triggerAbilityListener(
       handleOnCardPerformedBurnTrigger(params);
       return;
 
+    case "TTriggerOnCardPerformedPoison":
+      handleOnCardPerformedPoisonTrigger(params);
+      return;
+
     default:
       console.warn(`Unhandled trigger type: ${triggerType}`);
       return;
@@ -93,6 +97,41 @@ function handleOnItemUsedTrigger({
 }
 
 function handleOnCardPerformedBurnTrigger({
+  item,
+  ability,
+  event,
+  context,
+  queue,
+}: TriggerHandlerParams): void {
+  const firedItem = event.sourceItem;
+  const items = context.items;
+
+  if (!firedItem || !items) {
+    return;
+  }
+
+  const subject = ability?.Trigger?.Subject;
+  const subjectItems = resolveSubjectTargets(item, subject, items, {
+    triggerSourceItem: firedItem,
+    sourcePlayer: context.sourcePlayer,
+  }).items;
+
+  const shouldTrigger = subjectItems.some(
+    (subjectItem: DeckItem) => subjectItem.uid === firedItem.uid
+  );
+
+  if (!shouldTrigger) {
+    return;
+  }
+
+  queue.pushAction({
+    item,
+    action: ability.Action,
+    context: { ...context, sourceItem: firedItem },
+  });
+}
+
+function handleOnCardPerformedPoisonTrigger({
   item,
   ability,
   event,
