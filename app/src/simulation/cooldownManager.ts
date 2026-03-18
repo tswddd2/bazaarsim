@@ -47,6 +47,18 @@ export function initializeState(items: DeckItem[]): SimulationState {
     }
   }
 
+  // Initialise ICD state on every ability's action object
+  for (const item of simItems) {
+    if (!item.abilityIds) continue;
+    for (const abilityId of item.abilityIds) {
+      const ability = (item.card.Abilities as any)?.[abilityId];
+      if (ability?.Action) {
+        ability.Action.internalCooldown = 0;
+        ability.Action.events = [];
+      }
+    }
+  }
+
   const queue = new SimulationQueue();
 
   return {
@@ -85,6 +97,9 @@ export function tickCooldowns(state: SimulationState): void {
       cooldownState.currentCooldown = cooldownState.maxCooldown;
     }
   });
+
+  // Tick action internal cooldowns
+  state.queue.tickActionICDs(SIMULATION_TICK_DURATION_MS);
 
   // Increment time
   state.timeElapsed += SIMULATION_TICK_DURATION_MS;

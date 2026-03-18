@@ -13,11 +13,15 @@ export interface ActionEvent {
   context: ActionContext;
 }
 
+const ACTION_ICD_MS = 250;
+
 export class SimulationQueue {
   private signalQueue: SignalEvent[] = [];
   private actionQueue: ActionEvent[] = [];
   private listeners: Map<string, Array<(event: SignalEvent) => void>> =
     new Map();
+  /** Every action object that has ever been pushed, for ticking ICDs. */
+  private trackedActions: Set<any> = new Set();
 
   public on(signalName: string, listener: (event: SignalEvent) => void) {
     if (!this.listeners.has(signalName)) {
@@ -30,8 +34,34 @@ export class SimulationQueue {
     this.signalQueue.push(event);
   }
 
-  public pushAction(action: ActionEvent) {
-    this.actionQueue.push(action);
+  public pushAction(actionEvent: ActionEvent) {
+    const action = actionEvent.action;
+    this.trackedActions.add(action);
+
+    if (action.internalCooldown <= 0) {
+      action.internalCooldown = ACTION_ICD_MS;
+      this.actionQueue.push(actionEvent);
+    } else {
+      action.events.push(actionEvent);
+    }
+  }
+
+  /**
+   * Tick all action ICDs by deltaMs. When an ICD expires and stack > 0,
+   * release one stacked action into the queue.
+   */
+  public tickActionICDs(deltaMs: number): void {
+    this.trackedActions.forEach((act) => {
+      if (act.internalCooldown <= 0) return;
+
+      act.internalCooldown -= deltaMs;
+
+      if (act.internalCooldown <= 0 && act.events.length > 0) {
+        const event = act.events.pop();
+        event.action.internalCooldown = ACTION_ICD_MS;
+        this.actionQueue.push(event);
+      }
+    });
   }
 
   public registerTriggers(items: DeckItem[], context: ActionContext) {
@@ -51,13 +81,21 @@ export class SimulationQueue {
         }
       }
 
+      // Pre-create stable action objects so ICD state is preserved across firings
+      const beforeUsedAction = {
+        $type: "TActionBeforeItemUsed",
+        internalCooldown: 0,
+        stack: 0,
+      };
+      const itemUsedAction = {
+        $type: "TActionItemUsed",
+        internalCooldown: 0,
+        stack: 0,
+      };
+
       if (hasCardFired) {
         this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
-          this.pushAction({
-            item,
-            action: { $type: "TActionBeforeItemUsed" },
-            context,
-          });
+          this.pushAction({ item, action: beforeUsedAction, context });
         });
       }
 
@@ -78,11 +116,7 @@ export class SimulationQueue {
 
       if (hasCardFired) {
         this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
-          this.pushAction({
-            item,
-            action: { $type: "TActionItemUsed" },
-            context,
-          });
+          this.pushAction({ item, action: itemUsedAction, context });
         });
       }
     }
@@ -103,11 +137,12 @@ export class SimulationQueue {
         if (timeSeconds !== undefined) {
           actionEvent.context.eventTimeSeconds = timeSeconds;
         }
+
         executeAction(
           actionEvent.item,
           actionEvent.action,
           actionEvent.context,
-          this
+          this,
         );
       }
     }
