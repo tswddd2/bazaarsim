@@ -789,7 +789,7 @@
 
 .simulation-layout {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 1rem;
 }
 
@@ -909,4 +909,125 @@
   font-weight: 700;
   color: #ffffff;
   line-height: 1;
+}
+
+/* Simulation Table Sections */
+.sim-section {
+  background: #13131a;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 0.2s;
+}
+
+.sim-section:hover {
+  border-color: #3a3a45;
+}
+
+.sim-section-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ab;
+}
+
+.sim-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.sim-table thead th {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #566a78;
+  border-bottom: 1px solid #23232e;
+  text-align: left;
+}
+
+.sim-table thead th:not(:first-child) {
+  text-align: right;
+}
+
+.sim-table td {
+  padding: 0.45rem 0.5rem;
+  color: #8a9aaa;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sim-table td:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #c8d4de;
+}
+
+.sim-table tfoot td {
+  border-top: 1px solid #23232e;
+}
+
+/* Row colour variants */
+.sim-row--weapon td {
+  color: #7a9ab8;
+}
+.sim-row--weapon td:not(:first-child) {
+  color: #a8c8f0;
+}
+
+.sim-row--burn td {
+  color: #b86030;
+}
+.sim-row--burn td:not(:first-child) {
+  color: #f09060;
+}
+
+.sim-row--poison td {
+  color: #4a9840;
+}
+.sim-row--poison td:not(:first-child) {
+  color: #80d468;
+}
+
+.sim-row--total td {
+  font-weight: 700;
+  color: #b87830;
+}
+.sim-row--total td:not(:first-child) {
+  color: #e8b060;
+  font-size: 1.05rem;
+}
+
+/* Dot indicators */
+.sim-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+.sim-dot--weapon {
+  background: #7ab4e8;
+  box-shadow: 0 0 5px rgba(122, 180, 232, 0.55);
+}
+
+.sim-dot--burn {
+  background: #e07840;
+  box-shadow: 0 0 5px rgba(224, 120, 64, 0.55);
+}
+
+.sim-dot--poison {
+  background: #60b84a;
+  box-shadow: 0 0 5px rgba(96, 184, 74, 0.55);
 }

@@ -99,6 +99,8 @@ export function simulateBattle(
 
   const result: BattleResult = {
     totalDamage: 0,
+    totalBurnDamage: 0,
+    totalPoisonDamage: 0,
     damageOverTime: [], // Array of { time, damage } for each tick
     burnOverTime: [],
     poisonOverTime: [],
@@ -107,7 +109,12 @@ export function simulateBattle(
   };
 
   // Initialize damage over time with 0 damage at time 0
-  result.damageOverTime.push({ time: 0, cumulativeDamage: 0 });
+  result.damageOverTime.push({
+    time: 0,
+    cumulativeDamage: 0,
+    cumulativeBurnDamage: 0,
+    cumulativePoisonDamage: 0,
+  });
   result.burnOverTime.push({ time: 0, burn: state.players.opponent.Burn });
   result.poisonOverTime.push({
     time: 0,
@@ -135,6 +142,8 @@ export function simulateBattle(
     result.damageOverTime.push({
       time: parseFloat(currentTime),
       cumulativeDamage: result.totalDamage,
+      cumulativeBurnDamage: result.totalBurnDamage,
+      cumulativePoisonDamage: result.totalPoisonDamage,
     });
     result.burnOverTime.push({
       time: parseFloat(currentTime),
@@ -151,7 +160,14 @@ export function simulateBattle(
 
 export interface BattleResult {
   totalDamage: number;
-  damageOverTime: Array<{ time: number; cumulativeDamage: number }>;
+  totalBurnDamage: number;
+  totalPoisonDamage: number;
+  damageOverTime: Array<{
+    time: number;
+    cumulativeDamage: number;
+    cumulativeBurnDamage: number;
+    cumulativePoisonDamage: number;
+  }>;
   burnOverTime: Array<{ time: number; burn: number }>;
   poisonOverTime: Array<{ time: number; poison: number }>;
   cardEvents: BattleCardEvent[];
@@ -179,6 +195,7 @@ function applyBurnTickDamage(
   }
 
   result.totalDamage += opponentBurn;
+  result.totalBurnDamage += opponentBurn;
 
   const decay = Math.max(1, Math.round(opponentBurn * 0.05));
   state.players.opponent.Burn = Math.max(0, opponentBurn - decay);
@@ -199,4 +216,5 @@ function applyPoisonTickDamage(
   }
 
   result.totalDamage += opponentPoison;
+  result.totalPoisonDamage += opponentPoison;
 }

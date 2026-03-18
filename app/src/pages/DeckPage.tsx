@@ -5,6 +5,7 @@ import ItemDeck, {
   getSlotSize,
   handleAddItemLayout,
 } from "../components/ItemDeck";
+import SimulationPanel from "../components/SimulationPanel";
 import type { DeckItem } from "../components/ItemDeck";
 import { useCards } from "../hooks/useCards";
 import type { CardItem } from "../types";
@@ -221,38 +222,9 @@ export default function DeckPage() {
     setSelectedUid(null); // Close item detail panel when simulating
   }, [deckItems, isSimulating]);
 
-  // Get damage at the current simulation time
-  const getDamageAtTime = (time: number): number => {
-    if (!battleResult) return 0;
-
-    // Find the damage at the closest time point
-    const closestPoint = battleResult.damageOverTime.reduce((prev, curr) => {
-      return Math.abs(curr.time - time) < Math.abs(prev.time - time)
-        ? curr
-        : prev;
-    });
-
-    return closestPoint.cumulativeDamage;
-  };
-
-  const totalDamage = getDamageAtTime(simulationTime);
   const selectedSimulationItem = deckItems.find(
     (item) => item.uid === selectedUid
   );
-  const selectedItemStats = battleResult
-    ? battleResult.cardEvents
-        .filter(
-          (event) => event.uid === selectedUid && event.time <= simulationTime
-        )
-        .reduce(
-          (acc, event) => {
-            acc.hits += 1;
-            acc.damage += event.damage;
-            return acc;
-          },
-          { hits: 0, damage: 0 }
-        )
-    : { hits: 0, damage: 0 };
 
   return (
     <div className="app deck-page">
@@ -298,83 +270,13 @@ export default function DeckPage() {
               showFullWarning={showFullWarning}
             />
 
-            {isSimulating && (
-              <div className="simulation-panel">
-                <div className="panel-header">
-                  <h3 className="panel-title">Battle Simulation</h3>
-                </div>
-                <div className="simulation-controls">
-                  <label className="simulation-label">
-                    Time: {simulationTime.toFixed(1)}s
-                  </label>
-                  <input
-                    type="range"
-                    className="simulation-slider"
-                    min="0"
-                    max="20"
-                    step="0.5"
-                    value={simulationTime}
-                    onChange={(e) =>
-                      setSimulationTime(parseFloat(e.target.value))
-                    }
-                  />
-                  <div className="simulation-time-markers">
-                    <span>0s</span>
-                    <span>5s</span>
-                    <span>10s</span>
-                    <span>15s</span>
-                    <span>20s</span>
-                  </div>
-                </div>
-                <div className="panel-body simulation-body">
-                  <div className="simulation-layout">
-                    <div className="simulation-stats">
-                      <div className="stat-card">
-                        <div className="stat-label">Total Damage</div>
-                        <div className="stat-value">{totalDamage}</div>
-                      </div>
-                      <div className="stat-card">
-                        <div className="stat-label">DPS</div>
-                        <div className="stat-value">
-                          {simulationTime > 0
-                            ? (totalDamage / simulationTime).toFixed(1)
-                            : "0"}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="simulation-item-stats">
-                      <div className="panel-field">
-                        <label className="panel-label">Selected Item</label>
-                        {selectedSimulationItem ? (
-                          <div className="sim-item-name">
-                            {selectedSimulationItem.card.Localization?.Title
-                              ?.Text ??
-                              selectedSimulationItem.card.InternalName}
-                          </div>
-                        ) : (
-                          <span className="panel-empty">
-                            Click an item in deck
-                          </span>
-                        )}
-                      </div>
-                      <div className="simulation-stats simulation-stats-compact">
-                        <div className="stat-card">
-                          <div className="stat-label">Hits</div>
-                          <div className="stat-value">
-                            {selectedItemStats.hits}
-                          </div>
-                        </div>
-                        <div className="stat-card">
-                          <div className="stat-label">Damage</div>
-                          <div className="stat-value">
-                            {selectedItemStats.damage}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            {isSimulating && battleResult && (
+              <SimulationPanel
+                simulationTime={simulationTime}
+                setSimulationTime={setSimulationTime}
+                battleResult={battleResult}
+                selectedSimulationItem={selectedSimulationItem}
+              />
             )}
 
             {selectedItem && !isSimulating && (
