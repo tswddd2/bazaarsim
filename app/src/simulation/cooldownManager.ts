@@ -4,14 +4,7 @@ import { SimulationQueue } from "./eventSystem";
 
 export const SIMULATION_TICK_DURATION_MS = 100;
 
-export interface CooldownState {
-  uid: string;
-  currentCooldown: number; // in milliseconds
-  maxCooldown: number; // in milliseconds
-}
-
 export interface SimulationState {
-  cooldowns: Map<string, CooldownState>;
   timeElapsed: number; // in milliseconds
   players: PlayerState;
   queue: SimulationQueue;
@@ -22,8 +15,6 @@ export interface SimulationState {
  * Initialize cooldown states for all items in the deck
  */
 export function initializeState(items: DeckItem[]): SimulationState {
-  const cooldowns = new Map<string, CooldownState>();
-
   const simItems: SimDeckItem[] = items.map((item) => ({
     ...item,
     simStats: {
@@ -31,19 +22,16 @@ export function initializeState(items: DeckItem[]): SimulationState {
       burnApplied: 0,
       poisonApplied: 0,
       itemUsed: 0,
+      cooldown: null,
     },
     snapshots: [],
   }));
 
   for (const item of simItems) {
     const cooldownMax = item.attributes.CooldownMax;
-
-    if (cooldownMax !== undefined && cooldownMax > 0) {
-      cooldowns.set(item.uid, {
-        uid: item.uid,
-        currentCooldown: cooldownMax, // Wait one full cooldown before first fire
-        maxCooldown: cooldownMax,
-      });
+    item.attributes.hasCooldown = cooldownMax && cooldownMax > 0 ? 1 : 0;
+    if (item.attributes.hasCooldown) {
+      item.attributes.cooldown = cooldownMax;
     }
   }
 
@@ -62,7 +50,6 @@ export function initializeState(items: DeckItem[]): SimulationState {
   const queue = new SimulationQueue();
 
   return {
-    cooldowns,
     timeElapsed: 0,
     players: createInitialPlayerState(),
     queue,
@@ -74,19 +61,15 @@ export function initializeState(items: DeckItem[]): SimulationState {
  * Process a single simulation tick (0.1 seconds = 100ms)
  */
 export function tickCooldowns(state: SimulationState): void {
-  // Create a map for quick item lookup
-  const itemMap = new Map(state.items.map((item) => [item.uid, item]));
-
-  // Process each item with cooldown
-  state.cooldowns.forEach((cooldownState, uid) => {
-    const item = itemMap.get(uid);
-    if (!item) return;
+  // Process each item with a cooldown
+  for (const item of state.items) {
+    if (!item.attributes.hasCooldown) continue;
 
     // Decrease cooldown
-    cooldownState.currentCooldown -= SIMULATION_TICK_DURATION_MS;
+    item.attributes.cooldown -= SIMULATION_TICK_DURATION_MS;
 
     // Check if cooldown reached 0 or below
-    if (cooldownState.currentCooldown <= 0) {
+    if (item.attributes.cooldown <= 0) {
       // Emit signals for the fired item
       state.queue.emitSignal({
         signalName: `TTriggerOnCardFired-${item.uid}`,
@@ -94,9 +77,9 @@ export function tickCooldowns(state: SimulationState): void {
       });
 
       // Reset cooldown
-      cooldownState.currentCooldown = cooldownState.maxCooldown;
+      item.attributes.cooldown = item.attributes.cooldownMax;
     }
-  });
+  }
 
   // Tick action internal cooldowns
   state.queue.tickActionICDs(SIMULATION_TICK_DURATION_MS);
@@ -179,7 +162,12 @@ export function simulateBattle(
     for (const item of state.items) {
       item.snapshots.push({
         time: timeFloat,
-        stats: { ...item.simStats },
+        stats: {
+          ...item.simStats,
+          cooldown: item.attributes.hasCooldown
+            ? item.attributes.cooldown
+            : null,
+        },
       });
     }
   }

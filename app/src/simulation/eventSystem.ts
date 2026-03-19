@@ -38,6 +38,10 @@ export class SimulationQueue {
     const action = actionEvent.action;
     this.trackedActions.add(action);
 
+    if (!action.events) {
+      action.events = [];
+    }
+
     if (action.internalCooldown <= 0) {
       action.internalCooldown = ACTION_ICD_MS;
       this.actionQueue.push(actionEvent);
@@ -68,8 +72,6 @@ export class SimulationQueue {
     for (const item of items) {
       if (!item.abilityIds || item.abilityIds.length === 0) continue;
 
-      let hasCooldown = item.attributes.CooldownMax && item.attributes.CooldownMax > 0;
-
       // Pre-create stable action objects so ICD state is preserved across firings
       const beforeUsedAction = {
         $type: "TActionBeforeItemUsed",
@@ -82,7 +84,7 @@ export class SimulationQueue {
         stack: 0,
       };
 
-      if (hasCooldown) {
+      if (item.attributes.hasCooldown) {
         this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
           this.pushAction({ item, action: beforeUsedAction, context });
         });
@@ -103,7 +105,7 @@ export class SimulationQueue {
         });
       }
 
-      if (hasCooldown) {
+      if (item.attributes.hasCooldown) {
         this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
           this.pushAction({ item, action: itemUsedAction, context });
         });
@@ -131,7 +133,7 @@ export class SimulationQueue {
           actionEvent.item,
           actionEvent.action,
           actionEvent.context,
-          this,
+          this
         );
       }
     }

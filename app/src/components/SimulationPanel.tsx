@@ -242,10 +242,21 @@ export default function SimulationPanel({
                       <td>{selectedSimStats.poisonApplied}</td>
                     </tr>
                   )}
-                  <tr className="sim-row">
-                    <td>Times Used</td>
-                    <td>{selectedSimStats.itemUsed}</td>
-                  </tr>
+                  {selectedSimulationItem.attributes?.hasCooldown && (
+                    <>
+                      <tr className="sim-row sim-row--cooldown">
+                        <td>
+                          <span className="sim-dot sim-dot--cooldown" />
+                          Cooldown
+                        </td>
+                        <td>{selectedSimStats.cooldown?.toFixed(1)}s</td>
+                      </tr>
+                      <tr className="sim-row">
+                        <td>Times Used</td>
+                        <td>{selectedSimStats.itemUsed}</td>
+                      </tr>
+                    </>
+                  )}
                 </tbody>
               </table>
             )}

@@ -11,6 +11,7 @@ export interface ItemSimStats {
   burnApplied: number;
   poisonApplied: number;
   itemUsed: number;
+  cooldown: number | null;
 }
 
 export interface DeckItem {
