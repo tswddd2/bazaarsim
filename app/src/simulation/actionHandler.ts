@@ -47,6 +47,8 @@ export function executeAction(
       return handlePlayerPoisonApply(item, action, context, queue);
     case "TActionCardForceUse":
       return handleCardForceUse(item, action, context, queue);
+    case "TActionCardCharge":
+      return handleCardCharge(item, action, context, queue);
     case "TActionBeforeItemUsed":
       return handleActionBeforeItemUsed(item, action, context, queue);
     case "TActionItemUsed":
@@ -201,17 +203,7 @@ function handleCardForceUse(
 
   let targetsToUse = filteredTargets;
   if (targetCount !== null && targetCount < filteredTargets.length) {
-    const shuffledTargets = [...filteredTargets];
-
-    for (let i = shuffledTargets.length - 1; i > 0; i--) {
-      const randomIndex = Math.floor(Math.random() * (i + 1));
-      [shuffledTargets[i], shuffledTargets[randomIndex]] = [
-        shuffledTargets[randomIndex],
-        shuffledTargets[i],
-      ];
-    }
-
-    targetsToUse = shuffledTargets.slice(0, targetCount);
+    targetsToUse = pickRandom(filteredTargets, targetCount);
   }
 
   for (const targetItem of targetsToUse) {
@@ -224,10 +216,6 @@ function handleCardForceUse(
   return;
 }
 
-/**
- * Handle TActionPlayerDamage - deals damage to the opponent
- * For Katana, this uses the DamageAmount attribute
- */
 function handlePlayerDamage(
   item: DeckItem,
   action: any,
@@ -249,11 +237,6 @@ function handlePlayerDamage(
     return;
   }
 
-  // TODO: Apply damage modifiers:
-  // - Critical hit multiplier
-  // - Damage increase/decrease buffs
-  // - Enemy armor/resistance
-
   const finalDamage = damage;
 
   if (finalDamage > 0) {
@@ -264,9 +247,6 @@ function handlePlayerDamage(
   return;
 }
 
-/**
- * Handle TActionCardModifyAttribute - modifies one or more target item attributes.
- */
 function handleCardModifyAttribute(
   sourceItem: DeckItem,
   action: any,
@@ -304,17 +284,7 @@ function handleCardModifyAttribute(
 
   let targetsToModify = filteredTargets;
   if (targetCount !== null && targetCount < filteredTargets.length) {
-    const shuffledTargets = [...filteredTargets];
-
-    for (let i = shuffledTargets.length - 1; i > 0; i--) {
-      const randomIndex = Math.floor(Math.random() * (i + 1));
-      [shuffledTargets[i], shuffledTargets[randomIndex]] = [
-        shuffledTargets[randomIndex],
-        shuffledTargets[i],
-      ];
-    }
-
-    targetsToModify = shuffledTargets.slice(0, targetCount);
+    targetsToModify = pickRandom(filteredTargets, targetCount);
   }
 
   const amount = resolveNumericValue(sourceItem, action?.Value, context);
@@ -344,6 +314,79 @@ function handleCardModifyAttribute(
 
   return;
 }
+
+function handleCardCharge(
+  sourceItem: DeckItem,
+  action: any,
+  context: ActionContext,
+  queue: SimulationQueue
+): void {
+  const rawTargets = resolveSubjectTargets(
+    sourceItem,
+    action?.Target,
+    context.items,
+    {
+      triggerSourceItem: context.sourceItem,
+      sourcePlayer: context.sourcePlayer,
+    }
+  ).items;
+
+  if (rawTargets.length === 0) {
+    return;
+  }
+
+  const conditionPayload = action?.Target?.Conditions;
+  const filteredTargets =
+    conditionPayload == null
+      ? rawTargets
+      : rawTargets.filter((targetItem) =>
+          evaluateConditions(conditionPayload, {
+            sourceItem,
+            items: context.items,
+            triggerSourceItem: context.sourceItem,
+            currentItem: targetItem,
+          })
+        );
+
+  const chargeAmount =
+    action?.ReferenceValue != null
+      ? resolveNumericValue(sourceItem, action.ReferenceValue, context)
+      : sourceItem.attributes.ChargeAmount ?? 0;
+
+  const rawTargetCount =
+    action?.TargetCount != null
+      ? action.TargetCount
+      : sourceItem.attributes.ChargeTargets ?? null;
+
+  let targetsToCharge = filteredTargets;
+  if (rawTargetCount !== null && rawTargetCount < filteredTargets.length) {
+    targetsToCharge = pickRandom(filteredTargets, rawTargetCount);
+  }
+
+  for (const targetItem of targetsToCharge) {
+    if (!targetItem.attributes.hasCooldown) continue;
+
+    targetItem.attributes.cooldown -= chargeAmount;
+
+    if (targetItem.attributes.cooldown <= 0) {
+      targetItem.attributes.cooldown = targetItem.attributes.CooldownMax;
+      queue.emitSignal({
+        signalName: `TTriggerOnCardFired-${targetItem.uid}`,
+        sourceItem: targetItem,
+      });
+    }
+  }
+}
+
+function pickRandom<T>(items: T[], count: number): T[] {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const randomIndex = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[i]];
+  }
+  return shuffled.slice(0, count);
+}
+
 function applyAttributeOperation(
   currentValue: number,
   amount: number,
