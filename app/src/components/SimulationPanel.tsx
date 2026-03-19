@@ -1,11 +1,11 @@
-import type { DeckItem, SimDeckItem } from "./ItemDeck";
-import type { BattleResult } from "../simulation/cooldownManager";
+import type { SimDeckItem } from "./ItemDeck";
+import type { BattleStats } from "../simulation/cooldownManager";
 
 interface SimulationPanelProps {
   simulationTime: number;
   setSimulationTime: (time: number) => void;
-  battleResult: BattleResult;
-  selectedSimulationItem?: DeckItem;
+  battleResult: BattleStats;
+  selectedSimulationItem?: SimDeckItem;
 }
 
 export default function SimulationPanel({
@@ -52,11 +52,7 @@ export default function SimulationPanel({
 
   const selectedSimStats = (() => {
     if (!selectedSimulationItem) return null;
-    const simItem = battleResult.items.find(
-      (i) => i.uid === selectedSimulationItem.uid
-    ) as SimDeckItem | undefined;
-    if (!simItem || simItem.snapshots.length === 0) return null;
-    return simItem.snapshots.reduce((prev, curr) =>
+    return selectedSimulationItem.snapshots.reduce((prev, curr) =>
       Math.abs(curr.time - simulationTime) <
       Math.abs(prev.time - simulationTime)
         ? curr
@@ -245,11 +241,11 @@ export default function SimulationPanel({
                   {selectedSimulationItem.attributes?.hasCooldown && (
                     <>
                       <tr className="sim-row sim-row--cooldown">
+                        <td>Cooldown</td>
                         <td>
-                          <span className="sim-dot sim-dot--cooldown" />
-                          Cooldown
+                          {((selectedSimStats.cooldown ?? 0) / 1000).toFixed(1)}
+                          s
                         </td>
-                        <td>{selectedSimStats.cooldown?.toFixed(1)}s</td>
                       </tr>
                       <tr className="sim-row">
                         <td>Times Used</td>

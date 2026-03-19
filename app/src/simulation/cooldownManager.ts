@@ -9,6 +9,7 @@ export interface SimulationState {
   players: PlayerState;
   queue: SimulationQueue;
   items: SimDeckItem[];
+  battleStats: BattleStats;
 }
 
 /**
@@ -35,6 +36,32 @@ export function initializeState(items: DeckItem[]): SimulationState {
     }
   }
 
+  // Init player states
+  const players = createInitialPlayerState();
+
+  // Init battle stats tracking
+  const battleStats: BattleStats = {
+    totalDamage: 0,
+    totalBurnDamage: 0,
+    totalPoisonDamage: 0,
+    damageOverTime: [],
+    burnOverTime: [],
+    poisonOverTime: [],
+  };
+  battleStats.damageOverTime.push({
+    time: 0,
+    cumulativeDamage: 0,
+    cumulativeBurnDamage: 0,
+    cumulativePoisonDamage: 0,
+  });
+  battleStats.burnOverTime.push({ time: 0, burn: 0 });
+  battleStats.poisonOverTime.push({
+    time: 0,
+    poison: 0,
+  });
+
+  // Init simulation queue
+  const queue = new SimulationQueue();
   // Initialise ICD state on every ability's action object
   for (const item of simItems) {
     if (!item.abilityIds) continue;
@@ -46,14 +73,21 @@ export function initializeState(items: DeckItem[]): SimulationState {
       }
     }
   }
-
-  const queue = new SimulationQueue();
+  // Register all triggers from all items before starting battle
+  queue.registerTriggers(simItems, {
+    items: simItems,
+    players,
+    sourcePlayer: "Self",
+    battleStats,
+    eventTimeSeconds: 0,
+  });
 
   return {
     timeElapsed: 0,
-    players: createInitialPlayerState(),
+    players,
     queue,
     items: simItems,
+    battleStats,
   };
 }
 
@@ -77,7 +111,7 @@ export function tickCooldowns(state: SimulationState): void {
       });
 
       // Reset cooldown
-      item.attributes.cooldown = item.attributes.cooldownMax;
+      item.attributes.cooldown = item.attributes.CooldownMax;
     }
   }
 
@@ -94,68 +128,37 @@ export function tickCooldowns(state: SimulationState): void {
 export function simulateBattle(
   items: DeckItem[],
   maxTimeSeconds: number
-): BattleResult {
+): SimulationState {
   const state = initializeState(
     items.map((item) => ({ ...item, attributes: { ...item.attributes } }))
   );
   const maxTimeMs = maxTimeSeconds * 1000;
   const tickCount = Math.floor(maxTimeMs / SIMULATION_TICK_DURATION_MS);
 
-  const result: BattleResult = {
-    totalDamage: 0,
-    totalBurnDamage: 0,
-    totalPoisonDamage: 0,
-    damageOverTime: [],
-    burnOverTime: [],
-    poisonOverTime: [],
-    playerState: state.players,
-    items: state.items,
-  };
-
-  // Initialize damage over time with 0 damage at time 0
-  result.damageOverTime.push({
-    time: 0,
-    cumulativeDamage: 0,
-    cumulativeBurnDamage: 0,
-    cumulativePoisonDamage: 0,
-  });
-  result.burnOverTime.push({ time: 0, burn: state.players.opponent.Burn });
-  result.poisonOverTime.push({
-    time: 0,
-    poison: state.players.opponent.Poison,
-  });
-
-  // Register all triggers from all items before starting battle
-  state.queue.registerTriggers(state.items, {
-    items: state.items,
-    players: state.players,
-    sourcePlayer: "Self",
-    result,
-    eventTimeSeconds: 0,
-  });
+  const battleStats = state.battleStats;
 
   for (let tick = 0; tick < tickCount; tick++) {
     tickCooldowns(state);
 
     state.queue.processQueues(state.timeElapsed / 1000);
 
-    applyBurnTickDamage(state, result);
-    applyPoisonTickDamage(state, result);
+    applyBurnTickDamage(state);
+    applyPoisonTickDamage(state);
 
     // Record cumulative damage and per-item stats at this time
     const currentTime = (state.timeElapsed / 1000).toFixed(1);
     const timeFloat = parseFloat(currentTime);
-    result.damageOverTime.push({
+    battleStats.damageOverTime.push({
       time: timeFloat,
-      cumulativeDamage: result.totalDamage,
-      cumulativeBurnDamage: result.totalBurnDamage,
-      cumulativePoisonDamage: result.totalPoisonDamage,
+      cumulativeDamage: battleStats.totalDamage,
+      cumulativeBurnDamage: battleStats.totalBurnDamage,
+      cumulativePoisonDamage: battleStats.totalPoisonDamage,
     });
-    result.burnOverTime.push({
+    battleStats.burnOverTime.push({
       time: timeFloat,
       burn: state.players.opponent.Burn,
     });
-    result.poisonOverTime.push({
+    battleStats.poisonOverTime.push({
       time: timeFloat,
       poison: state.players.opponent.Poison,
     });
@@ -172,10 +175,10 @@ export function simulateBattle(
     }
   }
 
-  return result;
+  return state;
 }
 
-export interface BattleResult {
+export interface BattleStats {
   totalDamage: number;
   totalBurnDamage: number;
   totalPoisonDamage: number;
@@ -187,14 +190,9 @@ export interface BattleResult {
   }>;
   burnOverTime: Array<{ time: number; burn: number }>;
   poisonOverTime: Array<{ time: number; poison: number }>;
-  playerState: PlayerState;
-  items: SimDeckItem[];
 }
 
-function applyBurnTickDamage(
-  state: SimulationState,
-  result: BattleResult
-): void {
+function applyBurnTickDamage(state: SimulationState): void {
   const BURN_TICK_MS = 500;
   if (state.timeElapsed % BURN_TICK_MS !== 0) {
     return;
@@ -205,17 +203,14 @@ function applyBurnTickDamage(
     return;
   }
 
-  result.totalDamage += opponentBurn;
-  result.totalBurnDamage += opponentBurn;
+  state.battleStats.totalDamage += opponentBurn;
+  state.battleStats.totalBurnDamage += opponentBurn;
 
   const decay = Math.max(1, Math.round(opponentBurn * 0.05));
   state.players.opponent.Burn = Math.max(0, opponentBurn - decay);
 }
 
-function applyPoisonTickDamage(
-  state: SimulationState,
-  result: BattleResult
-): void {
+function applyPoisonTickDamage(state: SimulationState): void {
   const POISON_TICK_MS = 1000;
   if (state.timeElapsed % POISON_TICK_MS !== 0 || state.timeElapsed === 0) {
     return;
@@ -226,6 +221,6 @@ function applyPoisonTickDamage(
     return;
   }
 
-  result.totalDamage += opponentPoison;
-  result.totalPoisonDamage += opponentPoison;
+  state.battleStats.totalDamage += opponentPoison;
+  state.battleStats.totalPoisonDamage += opponentPoison;
 }

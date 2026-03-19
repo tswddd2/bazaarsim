@@ -38,10 +38,6 @@ export class SimulationQueue {
     const action = actionEvent.action;
     this.trackedActions.add(action);
 
-    if (!action.events) {
-      action.events = [];
-    }
-
     if (action.internalCooldown <= 0) {
       action.internalCooldown = ACTION_ICD_MS;
       this.actionQueue.push(actionEvent);
@@ -76,12 +72,12 @@ export class SimulationQueue {
       const beforeUsedAction = {
         $type: "TActionBeforeItemUsed",
         internalCooldown: 0,
-        stack: 0,
+        events: [],
       };
       const itemUsedAction = {
         $type: "TActionItemUsed",
         internalCooldown: 0,
-        stack: 0,
+        events: [],
       };
 
       if (item.attributes.hasCooldown) {

@@ -9,14 +9,14 @@ import {
 } from "./playerState";
 
 import type { SimulationQueue } from "./eventSystem";
-import type { BattleResult } from "./cooldownManager";
+import type { BattleStats } from "./cooldownManager";
 
 export interface ActionContext {
   items: SimDeckItem[];
   sourceItem?: DeckItem;
   players: PlayerState;
   sourcePlayer: PlayerSide;
-  result: BattleResult;
+  battleStats: BattleStats;
   eventTimeSeconds: number;
 }
 
@@ -257,7 +257,7 @@ function handlePlayerDamage(
   const finalDamage = damage;
 
   if (finalDamage > 0) {
-    context.result.totalDamage += finalDamage;
+    context.battleStats.totalDamage += finalDamage;
     (item as SimDeckItem).simStats.weaponDamage += finalDamage;
   }
 

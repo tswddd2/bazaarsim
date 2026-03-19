@@ -11,7 +11,8 @@ import { useCards } from "../hooks/useCards";
 import type { CardItem } from "../types";
 import {
   simulateBattle,
-  type BattleResult,
+  type SimulationState,
+  type BattleStats,
 } from "../simulation/cooldownManager";
 
 const DECK_STORAGE_KEY = "bazaarsim_deck";
@@ -131,7 +132,9 @@ export default function DeckPage() {
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationTime, setSimulationTime] = useState(0);
-  const [battleResult, setBattleResult] = useState<BattleResult | null>(null);
+  const [battleResult, setBattleResult] = useState<BattleStats | null>(null);
+  const [simulationState, setSimulationState] =
+    useState<SimulationState | null>(null);
 
   // Filter to items only (not skills, encounters, etc.)
   const itemCards = cards.filter((c) => c.Type === "Item");
@@ -215,14 +218,15 @@ export default function DeckPage() {
     }
 
     // Run the full battle simulation
-    const result = simulateBattle(deckItems, 20); // Simulate 20 seconds
-    setBattleResult(result);
+    const state = simulateBattle(deckItems, 20); // Simulate 20 seconds
+    setBattleResult(state.battleStats);
+    setSimulationState(state);
     setIsSimulating(true);
     setSimulationTime(0);
     setSelectedUid(null); // Close item detail panel when simulating
   }, [deckItems, isSimulating]);
 
-  const selectedSimulationItem = deckItems.find(
+  const selectedSimulationItem = simulationState?.items.find(
     (item) => item.uid === selectedUid
   );
 
