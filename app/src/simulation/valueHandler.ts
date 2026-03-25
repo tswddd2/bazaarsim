@@ -17,6 +17,10 @@ export function resolveValue(
 ): number {
   const valuePayload = value as any;
 
+  if (valuePayload?.$type === "TFixedValue") {
+    return valuePayload.Value;
+  }
+
   if (valuePayload?.$type === "TReferenceValueCardAttribute") {
     const allItems = context?.items ?? [sourceItem];
     const targets = resolveSubjectTargets(

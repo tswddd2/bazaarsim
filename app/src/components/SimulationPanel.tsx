@@ -80,10 +80,10 @@ export default function SimulationPanel({
         />
         <div className="simulation-time-markers">
           <span>0s</span>
-          <span>5s</span>
           <span>10s</span>
-          <span>15s</span>
           <span>20s</span>
+          <span>30s</span>
+          <span>40s</span>
         </div>
       </div>
       <div className="panel-body simulation-body">

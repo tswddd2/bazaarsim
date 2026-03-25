@@ -1,11 +1,11 @@
 import type { SimDeckItem } from "../components/ItemDeck";
-import { resolveSubjectTargets } from "./subjectHandler";
+import { resolveValue } from "./valueHandler";
 
 export interface ConditionContext {
   sourceItem: SimDeckItem;
   items: SimDeckItem[];
   triggerSourceItem?: SimDeckItem;
-  currentItem?: SimDeckItem;
+  currentItem: SimDeckItem;
 }
 
 /**
@@ -39,6 +39,9 @@ export function evaluateConditions(
     case "TCardConditionalTag":
       return evaluateTagCondition(condition, context);
 
+    case "TCardConditionalAttribute":
+      return evaluateAttributeCondition(condition, context);
+
     default:
       console.warn(`Unhandled condition type: ${condition?.$type}`);
       return false;
@@ -49,42 +52,65 @@ function evaluateTagCondition(
   condition: any,
   context: ConditionContext
 ): boolean {
-  const requiredTags: string[] = Array.isArray(condition?.Tags)
-    ? condition.Tags
-    : [];
-  if (requiredTags.length === 0) {
-    return true;
+  const conditionTags: string[] = condition.Tags;
+  const operator = condition.Operator;
+  const targetItem = context.currentItem;
+
+  const itemTags = new Set<string>([
+    ...(Array.isArray(targetItem.card.Tags) ? targetItem.card.Tags : []),
+    ...(Array.isArray(targetItem.card.HiddenTags)
+      ? targetItem.card.HiddenTags
+      : []),
+  ]);
+
+  switch (operator) {
+    case "None":
+      return conditionTags.every((tag) => !itemTags.has(tag));
+    case "Any":
+      return conditionTags.some((tag) => itemTags.has(tag));
+    case "All":
+      return conditionTags.every((tag) => itemTags.has(tag));
+    default:
+      console.warn(`Unhandled tag condition operator: ${operator}`);
+      return false;
   }
+}
 
-  const operator = condition?.Operator ?? "Any";
+function evaluateAttributeCondition(
+  condition: any,
+  context: ConditionContext
+): boolean {
+  const attribute: string = condition?.Attribute;
 
-  const targetItems: SimDeckItem[] = condition?.Target
-    ? resolveSubjectTargets(
-        context.sourceItem,
-        condition.Target,
-        context.items,
-        {
-          triggerSourceItem: context.triggerSourceItem,
-        }
-      ).items
-    : [context.currentItem ?? context.sourceItem];
+  const targetItem = context.currentItem;
+  const lhs: number = targetItem.attributes[attribute] ?? 0;
 
-  if (targetItems.length === 0) {
-    return false;
+  const valueContext = {
+    items: context.items,
+    firedItem: context.triggerSourceItem,
+  };
+  const rhs: number = resolveValue(
+    targetItem,
+    condition.ComparisonValue,
+    valueContext
+  );
+
+  const op: string = condition?.ComparisonOperator ?? "Equal";
+  switch (op) {
+    case "Equal":
+      return lhs === rhs;
+    case "NotEqual":
+      return lhs !== rhs;
+    case "GreaterThan":
+      return lhs > rhs;
+    case "GreaterThanOrEqual":
+      return lhs >= rhs;
+    case "LessThan":
+      return lhs < rhs;
+    case "LessThanOrEqual":
+      return lhs <= rhs;
+    default:
+      console.warn(`Unhandled ComparisonOperator: ${op}`);
+      return false;
   }
-
-  return targetItems.some((targetItem) => {
-    const itemTags = new Set<string>([
-      ...(Array.isArray(targetItem.card.Tags) ? targetItem.card.Tags : []),
-      ...(Array.isArray(targetItem.card.HiddenTags)
-        ? targetItem.card.HiddenTags
-        : []),
-    ]);
-
-    if (operator === "All") {
-      return requiredTags.every((tag) => itemTags.has(tag));
-    }
-
-    return requiredTags.some((tag) => itemTags.has(tag));
-  });
 }
