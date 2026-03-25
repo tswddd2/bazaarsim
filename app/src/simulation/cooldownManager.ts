@@ -2,7 +2,7 @@ import type { DeckItem, SimDeckItem } from "../components/ItemDeck";
 import { createInitialPlayerState, type PlayerState } from "./playerState";
 import { SimulationQueue } from "./eventSystem";
 
-export const SIMULATION_TICK_DURATION_MS = 10;
+export const SIMULATION_TICK_DURATION_MS = 50;
 export const COOLDOWN_MAX_MINIMUM = 1000;
 
 export interface SimulationState {
