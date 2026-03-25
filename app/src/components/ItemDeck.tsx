@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import type { CardItem } from "../types";
+import type { Attributes } from "../simulation/attributes";
 
 export interface ItemSimSnapshot {
   time: number;
@@ -20,7 +21,7 @@ export interface DeckItem {
   slotSize: number; // 1, 2, or 3
   startSlot: number; // 0-indexed starting slot position
   tier: string;
-  attributes: Record<string, number>;
+  attributes: Attributes;
   abilityIds: string[];
   tooltipIds: number[];
 }

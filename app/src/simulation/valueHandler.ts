@@ -1,17 +1,17 @@
-import type { DeckItem } from "../components/ItemDeck";
+import type { SimDeckItem } from "../components/ItemDeck";
 import { resolveSubjectTargets } from "./subjectHandler";
 
 export interface ValueContext {
-  items?: DeckItem[];
-  firedItem?: DeckItem;
+  items?: SimDeckItem[];
+  firedItem?: SimDeckItem;
 }
 
 /**
  * Resolves a Value/ReferenceValue JSON payload into a numeric value.
  * Currently supports TReferenceValueCardAttribute.
  */
-export function resolveNumericValue(
-  sourceItem: DeckItem,
+export function resolveValue(
+  sourceItem: SimDeckItem,
   value: unknown,
   context?: ValueContext
 ): number {

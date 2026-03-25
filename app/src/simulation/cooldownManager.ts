@@ -29,11 +29,7 @@ export function initializeState(items: DeckItem[]): SimulationState {
   }));
 
   for (const item of simItems) {
-    const cooldownMax = item.attributes.CooldownMax;
-    item.attributes.hasCooldown = cooldownMax && cooldownMax > 0 ? 1 : 0;
-    if (item.attributes.hasCooldown) {
-      item.attributes.cooldown = cooldownMax;
-    }
+    item.attributes.Cooldown = item.attributes.CooldownMax;
   }
 
   // Init player states
@@ -97,13 +93,14 @@ export function initializeState(items: DeckItem[]): SimulationState {
 export function tickCooldowns(state: SimulationState): void {
   // Process each item with a cooldown
   for (const item of state.items) {
-    if (!item.attributes.hasCooldown) continue;
+    if (item.attributes.CooldownMax <= 0 || item.attributes.CooldownDisabled)
+      continue;
 
     // Decrease cooldown
-    item.attributes.cooldown -= SIMULATION_TICK_DURATION_MS;
+    item.attributes.Cooldown -= SIMULATION_TICK_DURATION_MS;
 
     // Check if cooldown reached 0 or below
-    if (item.attributes.cooldown <= 0) {
+    if (item.attributes.Cooldown <= 0) {
       // Emit signals for the fired item
       state.queue.emitSignal({
         signalName: `TTriggerOnCardFired-${item.uid}`,
@@ -111,7 +108,7 @@ export function tickCooldowns(state: SimulationState): void {
       });
 
       // Reset cooldown
-      item.attributes.cooldown = item.attributes.CooldownMax;
+      item.attributes.Cooldown = item.attributes.CooldownMax;
     }
   }
 
@@ -167,9 +164,8 @@ export function simulateBattle(
         time: timeFloat,
         stats: {
           ...item.simStats,
-          cooldown: item.attributes.hasCooldown
-            ? item.attributes.cooldown
-            : null,
+          cooldown:
+            item.attributes.CooldownMax > 0 ? item.attributes.Cooldown : null,
         },
       });
     }

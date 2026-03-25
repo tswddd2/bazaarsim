@@ -14,12 +14,13 @@ import {
   type SimulationState,
   type BattleStats,
 } from "../simulation/cooldownManager";
+import { initAttributes } from "../simulation/attributes";
 
 const DECK_STORAGE_KEY = "bazaarsim_deck";
 
 function computeTierData(card: CardItem, targetTier: string) {
   const tiers = Object.keys(card.Tiers || {});
-  let attributes: Record<string, number> = {};
+  const attributes = initAttributes();
   let abilityIds: string[] = [];
   let tooltipIds: number[] = [];
 
@@ -30,7 +31,7 @@ function computeTierData(card: CardItem, targetTier: string) {
         if (tierData.Attributes) {
           Object.entries(tierData.Attributes).forEach(([k, v]) => {
             if (v !== null && v !== undefined) {
-              (attributes as any)[k] = v;
+              attributes[k] = v as number;
             }
           });
         }

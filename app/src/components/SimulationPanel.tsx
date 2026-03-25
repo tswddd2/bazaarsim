@@ -238,7 +238,7 @@ export default function SimulationPanel({
                       <td>{selectedSimStats.poisonApplied}</td>
                     </tr>
                   )}
-                  {selectedSimulationItem.attributes?.hasCooldown > 0 && (
+                  {selectedSimulationItem.attributes?.CooldownMax > 0 && (
                     <>
                       <tr className="sim-row sim-row--cooldown">
                         <td>Cooldown</td>

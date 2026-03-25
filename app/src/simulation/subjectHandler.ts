@@ -1,14 +1,14 @@
-import type { DeckItem } from "../components/ItemDeck";
+import type { SimDeckItem } from "../components/ItemDeck";
 import { evaluateConditions } from "./conditionHandler";
 import { getOppositePlayerSide, type PlayerSide } from "./playerState";
 
 export interface SubjectContext {
-  triggerSourceItem?: DeckItem;
+  triggerSourceItem?: SimDeckItem;
   sourcePlayer?: PlayerSide;
 }
 
 export interface ResolvedSubjectTargets {
-  items: DeckItem[];
+  items: SimDeckItem[];
   players: PlayerSide[];
 }
 
@@ -21,9 +21,9 @@ const EMPTY_SUBJECT_TARGETS: ResolvedSubjectTargets = {
  * Resolve trigger subject json to a list of deck item references.
  */
 export function resolveSubjectTargets(
-  sourceItem: DeckItem,
+  sourceItem: SimDeckItem,
   subject: any,
-  items: DeckItem[],
+  items: SimDeckItem[],
   context?: SubjectContext
 ): ResolvedSubjectTargets {
   if (!subject || !items.length) {
@@ -41,9 +41,14 @@ export function resolveSubjectTargets(
         context
       );
     case "TTargetCardSelf":
-      return resolveTargetCardSelfCase(sourceItem);
+      return resolveTargetCardSelfCase(sourceItem, subject, items, context);
     case "TTargetCardTriggerSource":
-      return resolveTargetCardTriggerSourceCase(context);
+      return resolveTargetCardTriggerSourceCase(
+        sourceItem,
+        subject,
+        items,
+        context
+      );
     case "TTargetPlayerRelative":
       return resolveTargetPlayerRelativeCase(subject, sourcePlayer);
     case "TTargetCardSection":
@@ -56,9 +61,9 @@ export function resolveSubjectTargets(
 }
 
 function resolveTargetCardPositionalCase(
-  sourceItem: DeckItem,
+  sourceItem: SimDeckItem,
   subject: any,
-  items: DeckItem[],
+  items: SimDeckItem[],
   context?: SubjectContext
 ): ResolvedSubjectTargets {
   return {
@@ -68,19 +73,57 @@ function resolveTargetCardPositionalCase(
 }
 
 function resolveTargetCardSelfCase(
-  sourceItem: DeckItem
+  sourceItem: SimDeckItem,
+  subject: any,
+  items: SimDeckItem[],
+  context?: SubjectContext
 ): ResolvedSubjectTargets {
+  let targets = [sourceItem];
+
+  if (subject?.Conditions != null) {
+    targets = targets.filter((targetItem) =>
+      evaluateConditions(subject.Conditions, {
+        sourceItem,
+        items,
+        triggerSourceItem: context?.triggerSourceItem,
+        currentItem: targetItem,
+      })
+    );
+  }
+
   return {
-    items: [sourceItem],
+    items: targets,
     players: [],
   };
 }
 
 function resolveTargetCardTriggerSourceCase(
+  sourceItem: SimDeckItem,
+  subject: any,
+  items: SimDeckItem[],
   context?: SubjectContext
 ): ResolvedSubjectTargets {
+  let targets: SimDeckItem[] = context?.triggerSourceItem
+    ? [context.triggerSourceItem]
+    : [];
+
+  if (subject?.ExcludeSelf) {
+    targets = targets.filter((item) => item.uid !== sourceItem.uid);
+  }
+
+  if (subject?.Conditions != null) {
+    targets = targets.filter((targetItem) =>
+      evaluateConditions(subject.Conditions, {
+        sourceItem,
+        items,
+        triggerSourceItem: context?.triggerSourceItem,
+        currentItem: targetItem,
+      })
+    );
+  }
+
   return {
-    items: context?.triggerSourceItem ? [context.triggerSourceItem] : [],
+    items: targets,
     players: [],
   };
 }
@@ -91,40 +134,77 @@ function resolveTargetPlayerRelativeCase(
 ): ResolvedSubjectTargets {
   const targetMode = subject?.TargetMode;
 
+  let players: PlayerSide[];
+
   if (targetMode === "Self") {
-    return { items: [], players: [sourcePlayer] };
+    players = [sourcePlayer];
+  } else if (targetMode === "Opponent") {
+    players = [getOppositePlayerSide(sourcePlayer)];
+  } else {
+    console.warn(
+      `Unhandled TTargetPlayerRelative target mode: ${subject?.TargetMode}`
+    );
+    return EMPTY_SUBJECT_TARGETS;
   }
 
-  if (targetMode === "Opponent") {
-    return {
-      items: [],
-      players: [getOppositePlayerSide(sourcePlayer)],
-    };
+  if (subject?.Conditions != null) {
+    players = players.filter((player) =>
+      evaluatePlayerConditions(subject.Conditions, player)
+    );
   }
 
-  console.warn(
-    `Unhandled TTargetPlayerRelative target mode: ${subject?.TargetMode}`
-  );
-  return EMPTY_SUBJECT_TARGETS;
+  return { items: [], players };
 }
 
 function resolveTargetCardSectionCase(
-  sourceItem: DeckItem,
+  sourceItem: SimDeckItem,
   subject: any,
-  items: DeckItem[],
+  items: SimDeckItem[],
   context?: SubjectContext
 ): ResolvedSubjectTargets {
   const targetSection = subject?.TargetSection;
 
-  let targets: DeckItem[];
+  let targets: SimDeckItem[];
 
   switch (targetSection) {
-    case "OpponentBoard":
-      targets = [];
-      break;
     case "SelfBoard":
+    case "SelfHand":
+    case "AbsolutePlayerHand":
       targets = [...items];
       break;
+
+    case "SelfHandAndStash":
+    case "AbsolutePlayerHandAndStash":
+      // Stash items not modeled in simulation; using board items only
+      targets = [...items];
+      break;
+
+    case "AllHands":
+      // Only self-board items available in current simulation
+      targets = [...items];
+      break;
+
+    case "OpponentHand":
+    case "AbsoluteOpponentHand":
+      // Opponent items not modeled in simulation
+      targets = [];
+      break;
+
+    case "SelfStash":
+      // Stash not modeled in simulation
+      targets = [];
+      break;
+
+    case "AbsolutePlayerSkills":
+      // Skills not modeled in simulation
+      targets = [];
+      break;
+
+    case "SelectionSet":
+      // Selection set not modeled in simulation
+      targets = [];
+      break;
+
     default:
       console.warn(
         `Unhandled TTargetCardSection target section: ${targetSection}`
@@ -154,11 +234,11 @@ function resolveTargetCardSectionCase(
 }
 
 function resolvePositionalTargets(
-  sourceItem: DeckItem,
+  sourceItem: SimDeckItem,
   subject: any,
-  items: DeckItem[],
+  items: SimDeckItem[],
   context?: SubjectContext
-): DeckItem[] {
+): SimDeckItem[] {
   if (subject?.Origin !== "Self") {
     console.warn(`Unhandled TTargetCardPositional origin: ${subject?.Origin}`);
     return [];
@@ -188,7 +268,7 @@ function resolvePositionalTargets(
     (item) => item.startSlot === sourceEnd + 1
   );
 
-  let targets: DeckItem[] = [];
+  let targets: SimDeckItem[] = [];
 
   switch (subject?.TargetMode) {
     case "Neighbor":
@@ -236,33 +316,59 @@ function resolvePositionalTargets(
 }
 
 function resolveNeighborTargetModeCase(
-  touchingLeft: DeckItem | undefined,
-  touchingRight: DeckItem | undefined
-): DeckItem[] {
-  return [touchingLeft, touchingRight].filter(Boolean) as DeckItem[];
+  touchingLeft: SimDeckItem | undefined,
+  touchingRight: SimDeckItem | undefined
+): SimDeckItem[] {
+  return [touchingLeft, touchingRight].filter(Boolean) as SimDeckItem[];
 }
 
-function resolveLeftCardTargetModeCase(leftItems: DeckItem[]): DeckItem[] {
+function resolveLeftCardTargetModeCase(
+  leftItems: SimDeckItem[]
+): SimDeckItem[] {
   return leftItems.length > 0 ? [leftItems[0]] : [];
 }
 
-function resolveRightCardTargetModeCase(rightItems: DeckItem[]): DeckItem[] {
+function resolveRightCardTargetModeCase(
+  rightItems: SimDeckItem[]
+): SimDeckItem[] {
   return rightItems.length > 0 ? [rightItems[0]] : [];
 }
 
-function resolveAllLeftCardsTargetModeCase(leftItems: DeckItem[]): DeckItem[] {
+function resolveAllLeftCardsTargetModeCase(
+  leftItems: SimDeckItem[]
+): SimDeckItem[] {
   return leftItems;
 }
 
 function resolveAllRightCardsTargetModeCase(
-  rightItems: DeckItem[]
-): DeckItem[] {
+  rightItems: SimDeckItem[]
+): SimDeckItem[] {
   return rightItems;
 }
 
-function uniqueByUid(items: DeckItem[]): DeckItem[] {
+/**
+ * Evaluate player-level conditions (e.g. TPlayerConditionalAttribute).
+ * Stub – returns true so unimplemented condition types don't silently
+ * block targets. Expand as condition types are implemented.
+ */
+function evaluatePlayerConditions(
+  conditions: unknown,
+  _player: PlayerSide
+): boolean {
+  if (conditions == null) {
+    return true;
+  }
+
+  const condition = conditions as any;
+  console.warn(
+    `Unhandled player condition type: ${condition?.$type ?? "unknown"}`
+  );
+  return true;
+}
+
+function uniqueByUid(items: SimDeckItem[]): SimDeckItem[] {
   const seen = new Set<string>();
-  const result: DeckItem[] = [];
+  const result: SimDeckItem[] = [];
 
   for (const item of items) {
     if (seen.has(item.uid)) {

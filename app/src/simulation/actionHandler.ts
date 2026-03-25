@@ -1,7 +1,6 @@
-import type { DeckItem, SimDeckItem } from "../components/ItemDeck";
-import { evaluateConditions } from "./conditionHandler";
+import type { SimDeckItem } from "../components/ItemDeck";
 import { resolveSubjectTargets } from "./subjectHandler";
-import { resolveNumericValue } from "./valueHandler";
+import { resolveValue } from "./valueHandler";
 import {
   getPlayerStatusBySide,
   type PlayerSide,
@@ -13,7 +12,7 @@ import type { BattleStats } from "./cooldownManager";
 
 export interface ActionContext {
   items: SimDeckItem[];
-  sourceItem?: DeckItem;
+  sourceItem?: SimDeckItem;
   players: PlayerState;
   sourcePlayer: PlayerSide;
   battleStats: BattleStats;
@@ -24,7 +23,7 @@ export interface ActionContext {
  * Execute an action from a triggered ability
  */
 export function executeAction(
-  item: DeckItem,
+  item: SimDeckItem,
   action: any,
   context: ActionContext,
   queue: SimulationQueue
@@ -61,7 +60,7 @@ export function executeAction(
 }
 
 function handleActionBeforeItemUsed(
-  item: DeckItem,
+  item: SimDeckItem,
   _action: any,
   _context: ActionContext,
   queue: SimulationQueue
@@ -73,13 +72,12 @@ function handleActionBeforeItemUsed(
 }
 
 function handleActionItemUsed(
-  item: DeckItem,
+  item: SimDeckItem,
   _action: any,
   _context: ActionContext,
   queue: SimulationQueue
 ): void {
-  const simItem = item as SimDeckItem;
-  simItem.simStats.itemUsed += 1;
+  item.simStats.itemUsed += 1;
 
   queue.emitSignal({
     signalName: "TTriggerOnItemUsed",
@@ -88,7 +86,7 @@ function handleActionItemUsed(
 }
 
 function handlePlayerBurnApply(
-  item: DeckItem,
+  item: SimDeckItem,
   action: any,
   context: ActionContext,
   queue: SimulationQueue
@@ -104,19 +102,15 @@ function handlePlayerBurnApply(
 
   const burnAmount =
     action?.ReferenceValue == null
-      ? item.attributes.BurnApplyAmount ?? 0
-      : resolveNumericValue(item, action.ReferenceValue, context);
-
-  if (burnAmount <= 0) {
-    return;
-  }
+      ? item.attributes.BurnApplyAmount
+      : resolveValue(item, action.ReferenceValue, context);
 
   for (const targetSide of targets) {
     const targetStatus = getPlayerStatusBySide(playerState, targetSide);
     targetStatus.Burn += burnAmount;
   }
 
-  (item as SimDeckItem).simStats.burnApplied += burnAmount;
+  item.simStats.burnApplied += burnAmount;
 
   queue.emitSignal({
     signalName: "TTriggerOnCardPerformedBurn",
@@ -127,7 +121,7 @@ function handlePlayerBurnApply(
 }
 
 function handlePlayerPoisonApply(
-  item: DeckItem,
+  item: SimDeckItem,
   action: any,
   context: ActionContext,
   queue: SimulationQueue
@@ -144,7 +138,7 @@ function handlePlayerPoisonApply(
   const poisonAmount =
     action?.ReferenceValue == null
       ? item.attributes.PoisonApplyAmount ?? 0
-      : resolveNumericValue(item, action.ReferenceValue, context);
+      : resolveValue(item, action.ReferenceValue, context);
 
   if (poisonAmount <= 0) {
     return;
@@ -155,7 +149,7 @@ function handlePlayerPoisonApply(
     targetStatus.Poison += poisonAmount;
   }
 
-  (item as SimDeckItem).simStats.poisonApplied += poisonAmount;
+  item.simStats.poisonApplied += poisonAmount;
 
   queue.emitSignal({
     signalName: "TTriggerOnCardPerformedPoison",
@@ -166,12 +160,12 @@ function handlePlayerPoisonApply(
 }
 
 function handleCardForceUse(
-  sourceItem: DeckItem,
+  sourceItem: SimDeckItem,
   action: any,
   context: ActionContext,
   queue: SimulationQueue
 ): void {
-  const rawTargets = resolveSubjectTargets(
+  const targets = resolveSubjectTargets(
     sourceItem,
     action?.Target,
     context.items,
@@ -181,29 +175,17 @@ function handleCardForceUse(
     }
   ).items;
 
-  if (rawTargets.length === 0) {
+  if (targets.length === 0) {
     return;
   }
 
-  const conditionPayload = action?.Target?.Conditions;
-  const filteredTargets =
-    conditionPayload == null
-      ? rawTargets
-      : rawTargets.filter((targetItem) =>
-          evaluateConditions(conditionPayload, {
-            sourceItem,
-            items: context.items,
-            triggerSourceItem: context.sourceItem,
-            currentItem: targetItem,
-          })
-        );
+  const targetCount = action?.TargetCount
+    ? resolveValue(sourceItem, action.TargetCount, context)
+    : sourceItem.attributes.ForceUseTargets ?? null;
 
-  const targetCount =
-    typeof action?.TargetCount === "number" ? action.TargetCount : null;
-
-  let targetsToUse = filteredTargets;
-  if (targetCount !== null && targetCount < filteredTargets.length) {
-    targetsToUse = pickRandom(filteredTargets, targetCount);
+  let targetsToUse = targets;
+  if (targetCount !== null && targetCount < targets.length) {
+    targetsToUse = pickRandom(targets, targetCount);
   }
 
   for (const targetItem of targetsToUse) {
@@ -217,7 +199,7 @@ function handleCardForceUse(
 }
 
 function handlePlayerDamage(
-  item: DeckItem,
+  item: SimDeckItem,
   action: any,
   context: ActionContext,
   _queue: SimulationQueue
@@ -225,7 +207,7 @@ function handlePlayerDamage(
   const damage =
     action?.ReferenceValue == null
       ? item.attributes.DamageAmount ?? 0
-      : resolveNumericValue(item, action.ReferenceValue, context);
+      : resolveValue(item, action.ReferenceValue, context);
 
   const isOpponentRelativeTarget =
     action?.Target?.$type === "TTargetPlayerRelative" &&
@@ -241,19 +223,19 @@ function handlePlayerDamage(
 
   if (finalDamage > 0) {
     context.battleStats.totalDamage += finalDamage;
-    (item as SimDeckItem).simStats.weaponDamage += finalDamage;
+    item.simStats.weaponDamage += finalDamage;
   }
 
   return;
 }
 
 function handleCardModifyAttribute(
-  sourceItem: DeckItem,
+  sourceItem: SimDeckItem,
   action: any,
   context: ActionContext,
   _queue: SimulationQueue
 ): void {
-  const rawTargets = resolveSubjectTargets(
+  const targets = resolveSubjectTargets(
     sourceItem,
     action?.Target,
     context.items,
@@ -262,32 +244,20 @@ function handleCardModifyAttribute(
       sourcePlayer: context.sourcePlayer,
     }
   ).items;
-  if (rawTargets.length === 0) {
+  if (targets.length === 0) {
     return;
   }
 
-  const conditionPayload = action?.Target?.Conditions;
-  const filteredTargets =
-    conditionPayload == null
-      ? rawTargets
-      : rawTargets.filter((targetItem) =>
-          evaluateConditions(conditionPayload, {
-            sourceItem,
-            items: context.items,
-            triggerSourceItem: context.sourceItem,
-            currentItem: targetItem,
-          })
-        );
+  const targetCount = action?.TargetCount
+    ? resolveValue(sourceItem, action.TargetCount, context)
+    : null;
 
-  const targetCount =
-    typeof action?.TargetCount === "number" ? action.TargetCount : null;
-
-  let targetsToModify = filteredTargets;
-  if (targetCount !== null && targetCount < filteredTargets.length) {
-    targetsToModify = pickRandom(filteredTargets, targetCount);
+  let targetsToModify = targets;
+  if (targetCount !== null && targetCount < targets.length) {
+    targetsToModify = pickRandom(targets, targetCount);
   }
 
-  const amount = resolveNumericValue(sourceItem, action?.Value, context);
+  const amount = resolveValue(sourceItem, action?.Value, context);
   const attributeType = action?.AttributeType;
   const operation = action?.Operation ?? "Add";
 
@@ -295,17 +265,9 @@ function handleCardModifyAttribute(
     return;
   }
 
-  for (const targetItem of targetsToModify) {
-    const runtimeTarget = targetItem as DeckItem & {
-      initialAttributes?: Record<string, number>;
-    };
-
-    if (!runtimeTarget.initialAttributes) {
-      runtimeTarget.initialAttributes = { ...runtimeTarget.attributes };
-    }
-
-    const currentValue = runtimeTarget.attributes[attributeType] ?? 0;
-    runtimeTarget.attributes[attributeType] = applyAttributeOperation(
+  for (const target of targetsToModify) {
+    const currentValue = target.attributes[attributeType] ?? 0;
+    target.attributes[attributeType] = applyAttributeOperation(
       currentValue,
       amount,
       operation
@@ -316,12 +278,12 @@ function handleCardModifyAttribute(
 }
 
 function handleCardCharge(
-  sourceItem: DeckItem,
+  sourceItem: SimDeckItem,
   action: any,
   context: ActionContext,
   queue: SimulationQueue
 ): void {
-  const rawTargets = resolveSubjectTargets(
+  const targets = resolveSubjectTargets(
     sourceItem,
     action?.Target,
     context.items,
@@ -331,45 +293,35 @@ function handleCardCharge(
     }
   ).items;
 
-  if (rawTargets.length === 0) {
+  if (targets.length === 0) {
     return;
   }
 
-  const conditionPayload = action?.Target?.Conditions;
-  const filteredTargets =
-    conditionPayload == null
-      ? rawTargets
-      : rawTargets.filter((targetItem) =>
-          evaluateConditions(conditionPayload, {
-            sourceItem,
-            items: context.items,
-            triggerSourceItem: context.sourceItem,
-            currentItem: targetItem,
-          })
-        );
-
   const chargeAmount =
     action?.ReferenceValue != null
-      ? resolveNumericValue(sourceItem, action.ReferenceValue, context)
+      ? resolveValue(sourceItem, action.ReferenceValue, context)
       : sourceItem.attributes.ChargeAmount ?? 0;
 
-  const rawTargetCount =
-    action?.TargetCount != null
-      ? action.TargetCount
-      : sourceItem.attributes.ChargeTargets ?? null;
+  const targetCount = action?.TargetCount
+    ? resolveValue(sourceItem, action.TargetCount, context)
+    : sourceItem.attributes.ChargeTargets ?? null;
 
-  let targetsToCharge = filteredTargets;
-  if (rawTargetCount !== null && rawTargetCount < filteredTargets.length) {
-    targetsToCharge = pickRandom(filteredTargets, rawTargetCount);
+  let targetsToCharge = targets;
+  if (targetCount !== null && targetCount < targets.length) {
+    targetsToCharge = pickRandom(targets, targetCount);
   }
 
   for (const targetItem of targetsToCharge) {
-    if (!targetItem.attributes.hasCooldown) continue;
+    if (
+      targetItem.attributes.CooldownMax <= 0 ||
+      targetItem.attributes.CooldownDisabled
+    )
+      continue;
 
-    targetItem.attributes.cooldown -= chargeAmount;
+    targetItem.attributes.Cooldown -= chargeAmount;
 
-    if (targetItem.attributes.cooldown <= 0) {
-      targetItem.attributes.cooldown = targetItem.attributes.CooldownMax;
+    if (targetItem.attributes.Cooldown <= 0) {
+      targetItem.attributes.Cooldown = targetItem.attributes.CooldownMax;
       queue.emitSignal({
         signalName: `TTriggerOnCardFired-${targetItem.uid}`,
         sourceItem: targetItem,

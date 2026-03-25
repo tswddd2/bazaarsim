@@ -1,4 +1,4 @@
-import type { DeckItem } from "../components/ItemDeck";
+import type { SimDeckItem } from "../components/ItemDeck";
 import { type ActionContext } from "./actionHandler";
 import { resolveSubjectTargets } from "./subjectHandler";
 import type { SimulationQueue, SignalEvent } from "./eventSystem";
@@ -6,7 +6,7 @@ import type { SimulationQueue, SignalEvent } from "./eventSystem";
 export interface TriggerContext extends ActionContext {}
 
 interface TriggerHandlerParams {
-  item: DeckItem;
+  item: SimDeckItem;
   ability: any;
   event: SignalEvent;
   context: ActionContext;
@@ -14,7 +14,7 @@ interface TriggerHandlerParams {
 }
 
 export function triggerAbilityListener(
-  item: DeckItem,
+  item: SimDeckItem,
   ability: any,
   event: SignalEvent,
   context: ActionContext,

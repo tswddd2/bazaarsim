@@ -1,14 +1,14 @@
-import type { DeckItem } from "../components/ItemDeck";
+import type { SimDeckItem } from "../components/ItemDeck";
 import { executeAction, type ActionContext } from "./actionHandler";
 import { triggerAbilityListener } from "./triggerHandler";
 
 export interface SignalEvent {
   signalName: string;
-  sourceItem?: DeckItem;
+  sourceItem?: SimDeckItem;
 }
 
 export interface ActionEvent {
-  item: DeckItem;
+  item: SimDeckItem;
   action: any;
   context: ActionContext;
 }
@@ -64,7 +64,7 @@ export class SimulationQueue {
     });
   }
 
-  public registerTriggers(items: DeckItem[], context: ActionContext) {
+  public registerTriggers(items: SimDeckItem[], context: ActionContext) {
     for (const item of items) {
       if (!item.abilityIds || item.abilityIds.length === 0) continue;
 
@@ -80,7 +80,7 @@ export class SimulationQueue {
         events: [],
       };
 
-      if (item.attributes.hasCooldown) {
+      if (item.attributes.CooldownMax > 0) {
         this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
           this.pushAction({ item, action: beforeUsedAction, context });
         });
@@ -101,7 +101,7 @@ export class SimulationQueue {
         });
       }
 
-      if (item.attributes.hasCooldown) {
+      if (item.attributes.CooldownMax > 0) {
         this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
           this.pushAction({ item, action: itemUsedAction, context });
         });

@@ -1,11 +1,11 @@
-import type { DeckItem } from "../components/ItemDeck";
+import type { SimDeckItem } from "../components/ItemDeck";
 import { resolveSubjectTargets } from "./subjectHandler";
 
 export interface ConditionContext {
-  sourceItem: DeckItem;
-  items: DeckItem[];
-  triggerSourceItem?: DeckItem;
-  currentItem?: DeckItem;
+  sourceItem: SimDeckItem;
+  items: SimDeckItem[];
+  triggerSourceItem?: SimDeckItem;
+  currentItem?: SimDeckItem;
 }
 
 /**
@@ -58,7 +58,7 @@ function evaluateTagCondition(
 
   const operator = condition?.Operator ?? "Any";
 
-  const targetItems: DeckItem[] = condition?.Target
+  const targetItems: SimDeckItem[] = condition?.Target
     ? resolveSubjectTargets(
         context.sourceItem,
         condition.Target,
