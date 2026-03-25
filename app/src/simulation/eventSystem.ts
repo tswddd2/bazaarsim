@@ -69,20 +69,28 @@ export class SimulationQueue {
       if (!item.abilityIds || item.abilityIds.length === 0) continue;
 
       // Pre-create stable action objects so ICD state is preserved across firings
-      const beforeUsedAction = {
-        $type: "TActionBeforeItemUsed",
-        internalCooldown: 0,
-        events: [],
+      const beforeUsedAbility = {
+        Trigger: { $type: "TTriggerOnCardFired" },
+        Action: {
+          $type: "TActionBeforeItemUsed",
+          internalCooldown: 0,
+          events: [],
+        },
+        Prerequisites: null,
       };
-      const itemUsedAction = {
-        $type: "TActionItemUsed",
-        internalCooldown: 0,
-        events: [],
+      const itemUsedAbility = {
+        Trigger: { $type: "TTriggerOnCardFired" },
+        Action: {
+          $type: "TActionItemUsed",
+          internalCooldown: 0,
+          events: [],
+        },
+        Prerequisites: null,
       };
 
       if (item.attributes.CooldownMax > 0) {
-        this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
-          this.pushAction({ item, action: beforeUsedAction, context });
+        this.on(`TTriggerOnCardFired-${item.uid}`, (event) => {
+          triggerAbilityListener(item, beforeUsedAbility, event, context, this);
         });
       }
 
@@ -102,14 +110,14 @@ export class SimulationQueue {
       }
 
       if (item.attributes.CooldownMax > 0) {
-        this.on(`TTriggerOnCardFired-${item.uid}`, (_event) => {
-          this.pushAction({ item, action: itemUsedAction, context });
+        this.on(`TTriggerOnCardFired-${item.uid}`, (event) => {
+          triggerAbilityListener(item, itemUsedAbility, event, context, this);
         });
       }
     }
   }
 
-  public processQueues(timeSeconds?: number) {
+  public processQueues(timeMs?: number) {
     while (this.signalQueue.length > 0 || this.actionQueue.length > 0) {
       while (this.signalQueue.length > 0) {
         const signal = this.signalQueue.shift()!;
@@ -121,8 +129,8 @@ export class SimulationQueue {
 
       if (this.actionQueue.length > 0) {
         const actionEvent = this.actionQueue.shift()!;
-        if (timeSeconds !== undefined) {
-          actionEvent.context.eventTimeSeconds = timeSeconds;
+        if (timeMs !== undefined) {
+          actionEvent.context.eventTimeMs = timeMs;
         }
 
         executeAction(

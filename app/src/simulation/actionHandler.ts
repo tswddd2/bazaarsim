@@ -16,7 +16,7 @@ export interface ActionContext {
   players: PlayerState;
   sourcePlayer: PlayerSide;
   battleStats: BattleStats;
-  eventTimeSeconds: number;
+  eventTimeMs: number;
 }
 
 /**
@@ -48,6 +48,12 @@ export function executeAction(
       return handleCardForceUse(item, action, context, queue);
     case "TActionCardCharge":
       return handleCardCharge(item, action, context, queue);
+    case "TActionCardHaste":
+      return handleCardHaste(item, action, context, queue);
+    case "TActionCardSlow":
+      return handleCardSlow(item, action, context, queue);
+    case "TActionCardFreeze":
+      return handleCardFreeze(item, action, context, queue);
     case "TActionBeforeItemUsed":
       return handleActionBeforeItemUsed(item, action, context, queue);
     case "TActionItemUsed":
@@ -96,9 +102,6 @@ function handlePlayerBurnApply(
   const targets = resolveSubjectTargets(item, action?.Target, context.items, {
     sourcePlayer: context.sourcePlayer,
   }).players;
-  if (targets.length === 0) {
-    return;
-  }
 
   const burnAmount =
     action?.ReferenceValue == null
@@ -131,9 +134,6 @@ function handlePlayerPoisonApply(
   const targets = resolveSubjectTargets(item, action?.Target, context.items, {
     sourcePlayer: context.sourcePlayer,
   }).players;
-  if (targets.length === 0) {
-    return;
-  }
 
   const poisonAmount =
     action?.ReferenceValue == null
@@ -174,10 +174,6 @@ function handleCardForceUse(
       sourcePlayer: context.sourcePlayer,
     }
   ).items;
-
-  if (targets.length === 0) {
-    return;
-  }
 
   const targetCount = action?.TargetCount
     ? resolveValue(sourceItem, action.TargetCount, context)
@@ -244,9 +240,6 @@ function handleCardModifyAttribute(
       sourcePlayer: context.sourcePlayer,
     }
   ).items;
-  if (targets.length === 0) {
-    return;
-  }
 
   const targetCount = action?.TargetCount
     ? resolveValue(sourceItem, action.TargetCount, context)
@@ -260,10 +253,6 @@ function handleCardModifyAttribute(
   const amount = resolveValue(sourceItem, action?.Value, context);
   const attributeType = action?.AttributeType;
   const operation = action?.Operation ?? "Add";
-
-  if (!attributeType || targetsToModify.length === 0) {
-    return;
-  }
 
   for (const target of targetsToModify) {
     const currentValue = target.attributes[attributeType] ?? 0;
@@ -292,10 +281,6 @@ function handleCardCharge(
       sourcePlayer: context.sourcePlayer,
     }
   ).items;
-
-  if (targets.length === 0) {
-    return;
-  }
 
   const chargeAmount =
     action?.ReferenceValue != null
@@ -327,6 +312,123 @@ function handleCardCharge(
         sourceItem: targetItem,
       });
     }
+  }
+}
+
+function handleCardHaste(
+  sourceItem: SimDeckItem,
+  action: any,
+  context: ActionContext,
+  queue: SimulationQueue
+): void {
+  const targets = resolveSubjectTargets(
+    sourceItem,
+    action?.Target,
+    context.items,
+    {
+      triggerSourceItem: context.sourceItem,
+      sourcePlayer: context.sourcePlayer,
+    }
+  ).items;
+
+  const hasteAmount =
+    action?.ReferenceValue != null
+      ? resolveValue(sourceItem, action.ReferenceValue, context)
+      : sourceItem.attributes.HasteAmount ?? 0;
+
+  const targetCount = action?.TargetCount
+    ? resolveValue(sourceItem, action.TargetCount, context)
+    : sourceItem.attributes.HasteTargets ?? null;
+
+  let targetsToHaste = targets;
+  if (targetCount !== null && targetCount < targets.length) {
+    targetsToHaste = pickRandom(targets, targetCount);
+  }
+
+  for (const targetItem of targetsToHaste) {
+    targetItem.attributes.Haste += hasteAmount;
+    queue.emitSignal({
+      signalName: `TTriggerOnCardAttributeChanged-Haste-Gain`,
+      sourceItem: targetItem,
+    });
+  }
+}
+
+function handleCardSlow(
+  sourceItem: SimDeckItem,
+  action: any,
+  context: ActionContext,
+  queue: SimulationQueue
+): void {
+  const targets = resolveSubjectTargets(
+    sourceItem,
+    action?.Target,
+    context.items,
+    {
+      triggerSourceItem: context.sourceItem,
+      sourcePlayer: context.sourcePlayer,
+    }
+  ).items;
+
+  const slowAmount =
+    action?.ReferenceValue != null
+      ? resolveValue(sourceItem, action.ReferenceValue, context)
+      : sourceItem.attributes.slowAmount ?? 0;
+
+  const targetCount = action?.TargetCount
+    ? resolveValue(sourceItem, action.TargetCount, context)
+    : sourceItem.attributes.SlowTargets ?? null;
+
+  let targetsToSlow = targets;
+  if (targetCount !== null && targetCount < targets.length) {
+    targetsToSlow = pickRandom(targets, targetCount);
+  }
+
+  for (const targetItem of targetsToSlow) {
+    targetItem.attributes.Slow += slowAmount;
+    queue.emitSignal({
+      signalName: `TTriggerOnCardAttributeChanged-Slow-Gain`,
+      sourceItem: targetItem,
+    });
+  }
+}
+
+function handleCardFreeze(
+  sourceItem: SimDeckItem,
+  action: any,
+  context: ActionContext,
+  queue: SimulationQueue
+): void {
+  const targets = resolveSubjectTargets(
+    sourceItem,
+    action?.Target,
+    context.items,
+    {
+      triggerSourceItem: context.sourceItem,
+      sourcePlayer: context.sourcePlayer,
+    }
+  ).items;
+
+  const freezeAmount =
+    action?.ReferenceValue != null
+      ? resolveValue(sourceItem, action.ReferenceValue, context)
+      : sourceItem.attributes.FreezeAmount ?? 0;
+
+  const targetCount = action?.TargetCount
+    ? resolveValue(sourceItem, action.TargetCount, context)
+    : sourceItem.attributes.FreezeTargets ?? null;
+
+  let targetsToFreeze = targets;
+  if (targetCount !== null && targetCount < targets.length) {
+    targetsToFreeze = pickRandom(targets, targetCount);
+  }
+
+  for (const targetItem of targetsToFreeze) {
+    targetItem.attributes.Freeze += freezeAmount;
+    queue.emitSignal({
+      signalName: `TTriggerOnCardAttributeChanged-Freeze-Gain`,
+      sourceItem: targetItem,
+    });
   }
 }
 

@@ -3,7 +3,7 @@ import type { CardItem } from "../types";
 import type { Attributes } from "../simulation/attributes";
 
 export interface ItemSimSnapshot {
-  time: number;
+  time: number; // in milliseconds
   stats: ItemSimStats;
 }
 

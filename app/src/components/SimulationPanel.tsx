@@ -67,16 +67,16 @@ export default function SimulationPanel({
       </div>
       <div className="simulation-controls">
         <label className="simulation-label">
-          Time: {simulationTime.toFixed(1)}s
+          Time: {(simulationTime / 1000).toFixed(1)}s
         </label>
         <input
           type="range"
           className="simulation-slider"
           min="0"
-          max="20"
-          step="0.5"
+          max="40000"
+          step="500"
           value={simulationTime}
-          onChange={(e) => setSimulationTime(parseFloat(e.target.value))}
+          onChange={(e) => setSimulationTime(parseInt(e.target.value, 10))}
         />
         <div className="simulation-time-markers">
           <span>0s</span>

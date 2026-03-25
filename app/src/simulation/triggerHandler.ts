@@ -62,7 +62,10 @@ function handleOnCardFiredTrigger({
   context,
   queue,
 }: TriggerHandlerParams): void {
-  queue.pushAction({ item, action: ability.Action, context });
+  const multicast = item.attributes.Multicast;
+  for (let i = 0; i < multicast; i++) {
+    queue.pushAction({ item, action: ability.Action, context });
+  }
 }
 
 function handleOnBeforeItemUsedTrigger({

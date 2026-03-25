@@ -219,7 +219,7 @@ export default function DeckPage() {
     }
 
     // Run the full battle simulation
-    const state = simulateBattle(deckItems, 20); // Simulate 20 seconds
+    const state = simulateBattle(deckItems, 40000); // Simulate 20 seconds
     setBattleResult(state.battleStats);
     setSimulationState(state);
     setIsSimulating(true);

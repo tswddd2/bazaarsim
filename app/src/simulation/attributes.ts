@@ -53,6 +53,8 @@ export interface Attributes {
   UpgradeTargets: number;
   /** Allows arbitrary extra keys such as "Custom_0" */
   [key: string]: number | undefined;
+  /** Self created attributes */
+  HasteBenefit: number;
 }
 
 /**
@@ -109,5 +111,6 @@ export function initAttributes(): Attributes {
     SlowTargets: 0,
     TransformTargets: 0,
     UpgradeTargets: 0,
+    HasteBenefit: 0,
   };
 }
